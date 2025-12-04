@@ -48,15 +48,7 @@ import {
 } from "firebase/firestore";
 
 // --- Firebase Configuration ---
-const firebaseConfig = {
-  apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-  authDomain: "dc-inspect.firebaseapp.com",
-  projectId: "dc-inspect",
-  storageBucket: "dc-inspect.firebasestorage.app",
-  messagingSenderId: "639013498118",
-  appId: "1:639013498118:web:15146029fbc159cbd30287",
-  measurementId: "G-5TETMHQ1EW"
-};
+const firebaseConfig = JSON.parse(__firebase_config);
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -64,7 +56,7 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // --- LOGO COMPONENT ---
 const DCLogo = () => (
-  <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="rounded-xl shadow-sm">
+  <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="rounded-xl shadow-sm flex-shrink-0">
     <rect width="100" height="100" rx="20" fill="#2563EB"/>
     <path d="M25 25H45C58.8071 25 70 36.1929 70 50V50C70 63.8071 58.8071 75 45 75H25V25Z" stroke="white" strokeWidth="8"/>
     <path d="M25 25V75" stroke="white" strokeWidth="8"/>
@@ -264,8 +256,8 @@ const compressImage = (file) => {
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 // Max dimensions
-                const MAX_WIDTH = 800;
-                const MAX_HEIGHT = 800;
+                const MAX_WIDTH = 1200;
+                const MAX_HEIGHT = 1200;
                 let width = img.width;
                 let height = img.height;
 
@@ -297,7 +289,7 @@ const downloadAsWord = (content, filename, images = []) => {
     if (images && images.length > 0) {
         imgHtml = '<br><br><h3>ATTACHED PHOTOS:</h3>';
         images.forEach(img => {
-            imgHtml += `<p><img src="${img}" width="300" /></p>`;
+            imgHtml += `<p><img src="${img}" width="400" /></p>`;
         });
     }
 
@@ -322,7 +314,7 @@ const printAsPdf = (content, images = []) => {
     if (images && images.length > 0) {
         imgHtml = '<div style="margin-top: 40px; page-break-before: auto;"><h3>FOTODOKUMENTATION</h3><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">';
         images.forEach(img => {
-            imgHtml += `<div style="text-align: center;"><img src="${img}" style="max-width: 100%; max-height: 300px; border: 1px solid #ccc;" /></div>`;
+            imgHtml += `<div style="text-align: center;"><img src="${img}" style="max-width: 100%; max-height: 300px; border: 1px solid #ccc; object-fit: contain;" /></div>`;
         });
         imgHtml += '</div></div>';
     }
@@ -337,6 +329,9 @@ const printAsPdf = (content, images = []) => {
                         h1 { color: #2563EB; font-size: 24px; border-bottom: 2px solid #2563EB; padding-bottom: 10px; }
                         h3 { margin-top: 20px; color: #475569; border-bottom: 1px solid #e2e8f0; }
                         .content { white-space: pre-wrap; }
+                        @media print {
+                            body { -webkit-print-color-adjust: exact; }
+                        }
                     </style>
                 </head>
                 <body>
@@ -467,7 +462,7 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragOver = (e) => {
-    e.preventDefault(); // Necessary to allow dropping
+    e.preventDefault(); 
     setIsDragOver(true);
   };
 
@@ -513,7 +508,6 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
               draggable
               onDragStart={(e) => {
                   e.dataTransfer.setData("appId", app.id);
-                  // Optional: Effect on dragging element
                   e.dataTransfer.effectAllowed = "move";
               }}
               onClick={() => onClickApp(app)}
@@ -589,7 +583,6 @@ export default function App() {
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'appointments');
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort: Incoming first, then date
       apps.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
       setAppointments(apps);
       setLoading(false);
@@ -645,17 +638,13 @@ export default function App() {
   };
 
   const handleUpdateStatus = async (appIdToUpdate, newStatus) => {
-    // If we are dragging, we might not have 'selectedAppointment', so we use appIdToUpdate
     const id = appIdToUpdate || (selectedAppointment ? selectedAppointment.id : null);
     if (!id || !user) return;
 
-    // Optional: Optimistic UI update for smoother drag feel
-    const updatedApps = appointments.map(a => 
-        a.id === id ? { ...a, status: newStatus } : a
-    );
+    // Optimistic UI update
+    const updatedApps = appointments.map(a => a.id === id ? { ...a, status: newStatus } : a);
     setAppointments(updatedApps);
 
-    // Update Detail View if open
     if (selectedAppointment && selectedAppointment.id === id) {
         setSelectedAppointment({ ...selectedAppointment, status: newStatus });
     }
@@ -740,16 +729,11 @@ export default function App() {
   };
   const triggerStationNav = (name, city) => { safeOpen(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${city}`)}`, t.confirmNav); };
   const toggleLanguage = () => { setLang(prev => prev === 'hr' ? 'en' : 'hr'); };
-  // Helpers
+  const catOptions = [ { value: 'inspection', label: t.catInspection }, { value: 'consulting', label: t.catConsulting }, { value: 'emergency', label: t.catEmergency } ];
   const getCategoryLabel = (catKey) => {
-    const map = {
-      'inspection': t.catInspection,
-      'consulting': t.catConsulting,
-      'emergency': t.catEmergency
-    };
+    const map = { 'inspection': t.catInspection, 'consulting': t.catConsulting, 'emergency': t.catEmergency };
     return map[catKey] || catKey;
   };
-  const catOptions = [ { value: 'inspection', label: t.catInspection }, { value: 'consulting', label: t.catConsulting }, { value: 'emergency', label: t.catEmergency } ];
 
   // Views
   if (loading) return <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-400 font-medium">Loading DC Inspect...</div>;
@@ -762,7 +746,7 @@ export default function App() {
           <button onClick={() => setView('list')} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"><ArrowLeft /></button>
           <h1 className="text-lg font-bold text-slate-800">{t.newAppointment}</h1>
         </div>
-        <div className="p-4 max-w-lg mx-auto">
+        <div className="p-4 w-full md:max-w-4xl mx-auto">
           <Card className="p-5">
             <Input label={t.labelCustomer} placeholder="e.g. Knezevic" value={formData.customerName} onChange={e => setFormData({...formData, customerName: e.target.value})} />
             <div className="grid grid-cols-2 gap-3">
@@ -787,7 +771,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-50 pb-20 font-sans">
         <div className={`text-white px-4 pt-4 pb-16 relative shadow-md transition-colors ${status === 'done' ? 'bg-green-600' : status === 'pending' ? 'bg-orange-500' : 'bg-blue-600'}`}>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 max-w-4xl mx-auto">
             <div className="flex items-center gap-3">
               <button onClick={() => setView('list')} className="p-2 -ml-2 hover:bg-white/20 rounded-full transition-colors"><ArrowLeft /></button>
               <span className="font-semibold tracking-wide opacity-90 text-sm">{t.backToList}</span>
@@ -796,13 +780,14 @@ export default function App() {
                 {status === 'incoming' ? t.colIncoming : status === 'pending' ? t.colPending : t.colDone}
             </div>
           </div>
-          <h1 className="text-3xl font-bold mb-1">{customerName}</h1>
-          <div className="flex items-center gap-2 opacity-90 text-sm"><MapPin size={14} /> {city}</div>
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold mb-1">{customerName}</h1>
+            <div className="flex items-center gap-2 opacity-90 text-sm"><MapPin size={14} /> {city}</div>
+          </div>
         </div>
 
-        <div className="px-4 -mt-10 relative z-10 max-w-lg mx-auto space-y-4">
+        <div className="px-4 -mt-10 relative z-10 w-full md:max-w-4xl mx-auto space-y-4">
           
-          {/* Status Switcher (Keep buttons in detail view for manual override) */}
           <Card className="p-2 flex gap-2">
             <button onClick={() => handleUpdateStatus(selectedAppointment.id, 'incoming')} className={`flex-1 py-2 text-[10px] md:text-xs font-bold rounded-lg transition-colors ${status === 'incoming' ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-50 text-slate-500'}`}>{t.colIncoming}</button>
             <button onClick={() => handleUpdateStatus(selectedAppointment.id, 'pending')} className={`flex-1 py-2 text-[10px] md:text-xs font-bold rounded-lg transition-colors ${status === 'pending' ? 'bg-orange-100 text-orange-700' : 'hover:bg-slate-50 text-slate-500'}`}>{t.colPending}</button>
@@ -825,7 +810,6 @@ export default function App() {
 
           <Button onClick={() => triggerNavigation(address || '', city)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
 
-          {/* TASKS & LOGISTICS */}
            <Card className="p-0 overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
               <h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckSquare size={18} className="text-blue-500"/> {t.tasksTitle}</h3>
@@ -842,13 +826,12 @@ export default function App() {
             </div>
           </Card>
 
-          <div className="space-y-4 mt-6">
-             <div className="flex items-center gap-2 text-slate-500 text-sm font-bold uppercase mb-2"><TrendingDown size={16} /> {t.logisticsTitle}</div>
-             <Card className="overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+             <Card className="overflow-hidden h-full">
                 <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-slate-700 flex items-center gap-2"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3></div>
                 <div className="p-4"><p className="text-sm text-slate-500 mb-3">{t.gasDesc}</p><Button onClick={triggerGasSearchNearMe} variant="secondary" className="w-full text-sm" icon={ExternalLink}>{t.gasButton}</Button></div>
              </Card>
-             <Card className="overflow-hidden">
+             <Card className="overflow-hidden h-full">
                 <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-slate-700 flex items-center gap-2"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3></div>
                 <div className="divide-y divide-slate-100">
                     {foodData.map((place, idx) => (
@@ -858,7 +841,6 @@ export default function App() {
              </Card>
           </div>
 
-          {/* REPORT GENERATOR & PHOTO UPLOAD */}
           <div className="space-y-2 mt-6">
             <div className="flex items-center gap-2 text-slate-500 text-sm font-bold uppercase mb-2">
                 <FileText size={16} /> {t.reportTitle}
@@ -872,7 +854,6 @@ export default function App() {
                         </button>
                         <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
                     </div>
-                    {/* Photo Grid */}
                     <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
                         {reportImages && reportImages.length > 0 ? (
                             reportImages.map((img, idx) => (
@@ -916,7 +897,6 @@ export default function App() {
     );
   }
 
-  // VIEW: KANBAN DASHBOARD
   const incomingApps = appointments.filter(a => (a.status || 'incoming') === 'incoming' && (a.customerName.toLowerCase().includes(filter.toLowerCase()) || a.city.toLowerCase().includes(filter.toLowerCase())));
   const pendingApps = appointments.filter(a => a.status === 'pending' && (a.customerName.toLowerCase().includes(filter.toLowerCase()) || a.city.toLowerCase().includes(filter.toLowerCase())));
   const doneApps = appointments.filter(a => a.status === 'done' && (a.customerName.toLowerCase().includes(filter.toLowerCase()) || a.city.toLowerCase().includes(filter.toLowerCase())));
@@ -938,35 +918,31 @@ export default function App() {
           </div>
       </div>
 
-      {/* KANBAN BOARD CONTAINER WITH DND PROP */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
-        <div className="h-full flex gap-4 min-w-[320px] md:min-w-full">
-            {/* Column 1: Incoming */}
+        <div className="h-full flex gap-4 min-w-[320px] md:min-w-full w-full">
             <KanbanColumn 
                 title={t.colIncoming} 
                 status="incoming" 
                 appointments={incomingApps} 
                 onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} 
                 lang={lang}
-                onStatusChange={handleUpdateStatus} // New prop for DnD
+                onStatusChange={handleUpdateStatus} 
             />
-            {/* Column 2: Pending */}
             <KanbanColumn 
                 title={t.colPending} 
                 status="pending" 
                 appointments={pendingApps} 
                 onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} 
                 lang={lang}
-                onStatusChange={handleUpdateStatus} // New prop for DnD
+                onStatusChange={handleUpdateStatus} 
             />
-            {/* Column 3: Done */}
             <KanbanColumn 
                 title={t.colDone} 
                 status="done" 
                 appointments={doneApps} 
                 onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} 
                 lang={lang}
-                onStatusChange={handleUpdateStatus} // New prop for DnD
+                onStatusChange={handleUpdateStatus} 
             />
         </div>
       </div>
