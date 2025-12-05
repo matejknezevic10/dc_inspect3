@@ -21,7 +21,7 @@ try {
   messagingSenderId: "639013498118",
   appId: "1:639013498118:web:15146029fbc159cbd30287",
   measurementId: "G-5TETMHQ1EW"
-    };
+  };
   }
 } catch (e) { console.error("Config Error", e); }
 
@@ -34,18 +34,7 @@ try {
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- Components ---
-const DCLogo = () => (
-  <svg width="32" height="32" viewBox="0 0 100 100" fill="none" className="rounded-lg shadow-sm flex-shrink-0">
-    <rect width="100" height="100" rx="20" fill="#2563EB"/>
-    <path d="M25 25H45C58.8071 25 70 36.1929 70 50V50C70 63.8071 58.8071 75 45 75H25V25Z" stroke="white" strokeWidth="8"/>
-    <path d="M25 25V75" stroke="white" strokeWidth="8"/>
-    <path d="M65 65L80 80" stroke="white" strokeWidth="8" strokeLinecap="round"/>
-    <circle cx="55" cy="50" r="15" stroke="white" strokeWidth="6" strokeOpacity="0.5"/>
-    <text x="50" y="62" fontSize="35" fontWeight="bold" fill="white" textAnchor="middle" fontFamily="sans-serif">DC</text>
-  </svg>
-);
-
+// --- Translations ---
 const translations = {
   hr: {
     appTitle: "DC INSPECT", subtitle: "Mobilni Asistent", newAppointment: "Novi Termin",
@@ -58,7 +47,8 @@ const translations = {
     save: "Spremi", delete: "Obriši", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Pokreni Navigaciju", gasButton: "Traži benzinske (GPS)", logisticsTitle: "Logistika", foodTitle: "Hrana", gasTitle: "Gorivo", gasDesc: "Cijene u blizini", confirmDelete: "Obrisati?",
     catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
-    reportNotesPlaceholder: "- Kvar na ventilu...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja"
+    reportNotesPlaceholder: "- Kvar na ventilu...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja",
+    mobileTabIncoming: "Novi", mobileTabPending: "U Tijeku", mobileTabDone: "Gotovo"
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant", newAppointment: "New Task",
@@ -71,7 +61,8 @@ const translations = {
     save: "Save", delete: "Delete", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Start Navigation", gasButton: "Search Gas Stations (GPS)", logisticsTitle: "Logistics", foodTitle: "Food", gasTitle: "Fuel", gasDesc: "Prices nearby", confirmDelete: "Delete?",
     catInspection: "Inspection", catConsulting: "Consulting", catEmergency: "Emergency",
-    reportNotesPlaceholder: "- Valve broken...", generateBtn: "Generate Report", reportResultLabel: "Report Preview"
+    reportNotesPlaceholder: "- Valve broken...", generateBtn: "Generate Report", reportResultLabel: "Report Preview",
+    mobileTabIncoming: "Incoming", mobileTabPending: "Pending", mobileTabDone: "Done"
   }
 };
 
@@ -129,6 +120,7 @@ export default function App() {
   const [lang, setLang] = useState('hr');
   const t = translations[lang];
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [mobileTab, setMobileTab] = useState('incoming');
   const [foodData, setFoodData] = useState([]);
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({ customerName: '', city: '', address: '', date: '', time: '', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [] });
@@ -222,7 +214,6 @@ export default function App() {
 
   if(view === 'detail' && selectedAppointment) {
     const a = selectedAppointment;
-    // Helper to generate report from current note state (live)
     const handleReportUpdate = (noteText) => {
         const finalText = generateReportText(noteText, a.customerName, a.date, a.category, lang);
         updateApp(a.id, { reportNotes: noteText, finalReport: finalText });
@@ -324,7 +315,10 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col h-screen overflow-hidden text-slate-900">
       <div className="bg-white px-5 py-4 border-b border-slate-200 flex justify-between items-center shadow-sm z-20 flex-shrink-0">
-         <div className="flex items-center gap-3"><DCLogo/><div><h1 className="text-xl font-black text-blue-900 tracking-tight">{t.appTitle}</h1><p className="text-[10px] text-slate-500 font-medium">{t.subtitle}</p></div></div>
+         <div className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg object-cover shadow-sm" />
+            <div><h1 className="text-xl font-black text-blue-900 tracking-tight">{t.appTitle}</h1><p className="text-[10px] text-slate-500 font-medium">{t.subtitle}</p></div>
+         </div>
          <div className="flex gap-2">
             <button onClick={() => setView('dashboard')} className={`p-2 rounded-lg ${view==='dashboard'?'bg-blue-50 text-blue-600':'text-slate-400'}`}><LayoutDashboard size={20}/></button>
             <button onClick={() => setView('archive')} className={`p-2 rounded-lg ${view==='archive'?'bg-blue-50 text-blue-600':'text-slate-400'}`}><Archive size={20}/></button>
