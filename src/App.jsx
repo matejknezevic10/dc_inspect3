@@ -48,8 +48,13 @@ import {
 } from "firebase/firestore";
 
 // --- Firebase Configuration ---
-// WICHTIG: Ersetze diesen Block mit deinen ECHTEN Daten aus der Firebase Console!
-const firebaseConfig = {
+// LOGIK: Wenn wir in der Vorschau sind, nutzen wir die automatische Config.
+// Wenn wir lokal/auf Vercel sind, nutzen wir deine eingetragenen Daten.
+let firebaseConfig;
+
+if (typeof __firebase_config !== 'undefined') {
+  // Automatische Konfiguration für die Vorschau
+  firebaseConfig = {
   apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
   authDomain: "dc-inspect.firebaseapp.com",
   projectId: "dc-inspect",
@@ -58,6 +63,18 @@ const firebaseConfig = {
   appId: "1:639013498118:web:15146029fbc159cbd30287",
   measurementId: "G-5TETMHQ1EW"
 };
+} else {
+  // MANUELLE Konfiguration für Vercel / Localhost
+  // WICHTIG: Hier musst du deine Daten aus der Firebase Console eintragen!
+  firebaseConfig = {
+    apiKey: "HIER_DEIN_API_KEY_EINFÜGEN", 
+    authDomain: "dein-projekt.firebaseapp.com",
+    projectId: "dein-projekt",
+    storageBucket: "dein-projekt.firebasestorage.app",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef"
+  };
+}
 
 // Initialisierung mit Fehlerabfangung
 let app, auth, db;
@@ -440,7 +457,7 @@ const Card = ({ children, className = '', onClick }) => (
   </div>
 );
 
-// --- Kanban Column Component ---
+// --- Kanban Column Component with Drag & Drop ---
 const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange }) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -542,10 +559,12 @@ export default function App() {
   });
 
   useEffect(() => {
+    // Falls Firebase nicht konfiguriert ist, abbrechen, um Absturz zu vermeiden
     if (!app || !auth) {
       setLoading(false);
       return;
     }
+
     const initAuth = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         await signInWithCustomToken(auth, __initial_auth_token);
@@ -618,11 +637,15 @@ export default function App() {
   const handleUpdateStatus = async (appIdToUpdate, newStatus) => {
     const id = appIdToUpdate || (selectedAppointment ? selectedAppointment.id : null);
     if (!id || !user) return;
+
+    // Optimistic UI update
     const updatedApps = appointments.map(a => a.id === id ? { ...a, status: newStatus } : a);
     setAppointments(updatedApps);
+
     if (selectedAppointment && selectedAppointment.id === id) {
         setSelectedAppointment({ ...selectedAppointment, status: newStatus });
     }
+    
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id), { status: newStatus });
     } catch (e) { console.error(e); }
@@ -656,8 +679,10 @@ export default function App() {
       if (e.target.files && e.target.files[0] && selectedAppointment) {
           const file = e.target.files[0];
           const compressedBase64 = await compressImage(file);
+          
           const currentImages = selectedAppointment.reportImages || [];
           const newImages = [...currentImages, compressedBase64];
+          
           setSelectedAppointment({ ...selectedAppointment, reportImages: newImages });
           try {
              await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', selectedAppointment.id), { reportImages: newImages });
@@ -704,10 +729,6 @@ export default function App() {
     const map = { 'inspection': t.catInspection, 'consulting': t.catConsulting, 'emergency': t.catEmergency };
     return map[catKey] || catKey;
   };
-
-  if (!firebaseConfig.apiKey.includes("AIzaSy")) {
-      // Placeholder warning logic
-  }
 
   if (loading) return <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-400 font-medium">Loading DC Inspect...</div>;
   if (!app) return (
