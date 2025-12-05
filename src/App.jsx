@@ -14,13 +14,13 @@ try {
   } else {
     // HIER DEINE DATEN EINTRAGEN
     firebaseConfig = {
-    apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-    authDomain: "dc-inspect.firebaseapp.com",
-    projectId: "dc-inspect",
-    storageBucket: "dc-inspect.firebasestorage.app",
-    messagingSenderId: "639013498118",
-    appId: "1:639013498118:web:15146029fbc159cbd30287",
-    measurementId: "G-5TETMHQ1EW"
+      apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+      authDomain: "dc-inspect.firebaseapp.com",
+      projectId: "dc-inspect",
+      storageBucket: "dc-inspect.firebasestorage.app",
+      messagingSenderId: "639013498118",
+      appId: "1:639013498118:web:15146029fbc159cbd30287",
+      measurementId: "G-5TETMHQ1EW"
     };
   }
 } catch (e) { console.error("Config Error", e); }
@@ -58,7 +58,8 @@ const translations = {
     save: "Spremi", delete: "Obriši", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Pokreni Navigaciju", gasButton: "Traži benzinske (GPS)", logisticsTitle: "Logistika", foodTitle: "Hrana", gasTitle: "Gorivo", gasDesc: "Cijene u blizini", confirmDelete: "Obrisati?",
     catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
-    mobileTabIncoming: "Novi", mobileTabPending: "U Tijeku", mobileTabDone: "Gotovo"
+    mobileTabIncoming: "Novi", mobileTabPending: "U Tijeku", mobileTabDone: "Gotovo",
+    reportNotesPlaceholder: "- Kvar na ventilu...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja"
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant", newAppointment: "New Task",
@@ -71,7 +72,8 @@ const translations = {
     save: "Save", delete: "Delete", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Start Navigation", gasButton: "Search Gas Stations (GPS)", logisticsTitle: "Logistics", foodTitle: "Food", gasTitle: "Fuel", gasDesc: "Prices nearby", confirmDelete: "Delete?",
     catInspection: "Inspection", catConsulting: "Consulting", catEmergency: "Emergency",
-    mobileTabIncoming: "Incoming", mobileTabPending: "Pending", mobileTabDone: "Done"
+    mobileTabIncoming: "Incoming", mobileTabPending: "Pending", mobileTabDone: "Done",
+    reportNotesPlaceholder: "- Valve broken...", generateBtn: "Generate Report", reportResultLabel: "Report Preview"
   }
 };
 
@@ -80,7 +82,7 @@ const safeOpen = (url) => { if(!url) return; const w = window.open(url, '_blank'
 const compressImage = (file) => new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const cvs = document.createElement('canvas'); const max = 1000; let w = img.width, h = img.height; if(w>h){if(w>max){h*=max/w;w=max;}}else{if(h>max){w*=max/h;h=max;}} cvs.width=w; cvs.height=h; const ctx = cvs.getContext('2d'); ctx.drawImage(img,0,0,w,h); resolve(cvs.toDataURL('image/jpeg', 0.6)); } } });
 const downloadAsWord = (c,f,i=[]) => { let h=`<html><body><div style="font-family:Arial;white-space:pre-wrap;">${c}</div>${i.map(u=>`<p><img src="${u}" width="400"/></p>`).join('')}</body></html>`; const b=new Blob(['\ufeff',h],{type:'application/msword'}); const u=URL.createObjectURL(b); const l=document.createElement('a'); l.href=u; l.download=`${f}.doc`; document.body.appendChild(l); l.click(); document.body.removeChild(l); };
 const printAsPdf = (c,i=[]) => { const w=window.open('','_blank'); if(w){w.document.write(`<html><head><style>body{font-family:Arial;padding:20px;white-space:pre-wrap}img{max-width:100%;max-height:300px;margin:10px}</style></head><body><div>${c}</div><div>${i.map(u=>`<img src="${u}"/>`).join('')}</div></body></html>`); w.document.close(); setTimeout(()=>w.print(),500);} };
-const generateReportText = (n,c,d,cat,l) => { const ds=new Date(d).toLocaleDateString(); return l==='hr' ? `IZVJEŠTAJ\nKlijent: ${c}\nDatum: ${ds}\nKategorija: ${cat}\n\nNALAZI:\n${n}` : `REPORT\nClient: ${c}\nDate: ${ds}\nCategory: ${cat}\n\nFINDINGS:\n${n}`; };
+const generateReportText = (n,c,d,cat,l) => { const ds=new Date(d).toLocaleDateString(); return l==='hr' ? `IZVJEŠTAJ\nKlijent: ${c}\nDatum: ${ds}\nKategorija: ${cat}\n\nNALAZI I RADOVI:\n${n}` : `REPORT\nClient: ${c}\nDate: ${ds}\nCategory: ${cat}\n\nFINDINGS:\n${n}`; };
 const generateRouteRestaurants = (city, lang) => { return [ { name: "Highway Rest Stop A1", type: "Rest Stop", dist: "On Route" }, { name: `Grill House ${city}`, type: "Local Food", dist: "2 min detour" }, { name: "Coffee & Drive", type: "Snack", dist: "On Route" } ]; };
 
 // UI Components
@@ -140,7 +142,6 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Fix: Auth Initialization
   useEffect(() => {
     if(!app || !auth) return;
     const initAuth = async () => {
@@ -159,21 +160,17 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fix: Data Fetching DEPENDS on user
   useEffect(() => {
-    if(!db || !user) return; // Wait for user to be authenticated
+    if(!db || !user) return;
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'appointments');
     const unsubscribe = onSnapshot(q, (snap) => {
       const apps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       apps.sort((a,b) => new Date(a.date) - new Date(b.date));
       setAppointments(apps);
       setLoading(false);
-    }, (err) => {
-      console.error("Firestore Error:", err);
-      // Optional: Set some error state here
-    });
+    }, (err) => { console.error("Firestore Error:", err); });
     return () => unsubscribe();
-  }, [user]); // Add user dependency
+  }, [user]);
 
   const saveApp = async (data) => {
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'appointments'), { 
@@ -228,6 +225,13 @@ export default function App() {
 
   if(view === 'detail' && selectedAppointment) {
     const a = selectedAppointment;
+    // Helper to generate report from current note state (live)
+    const handleReportUpdate = (noteText) => {
+        const finalText = generateReportText(noteText, a.customerName, a.date, a.category, lang);
+        updateApp(a.id, { reportNotes: noteText, finalReport: finalText });
+        setSelectedAppointment({ ...a, reportNotes: noteText, finalReport: finalText });
+    };
+
     return (
       <div className="min-h-screen bg-slate-50 pb-24 font-sans text-slate-900">
         <div className={`text-white px-4 pt-4 pb-16 shadow-md ${a.status==='done'?'bg-green-600':a.status==='pending'?'bg-orange-500':'bg-blue-600'}`}>
@@ -288,11 +292,28 @@ export default function App() {
                  </label>
                  {(a.reportImages||[]).map((img, i) => (<div key={i} className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200"><img src={img} className="w-full h-full object-cover"/><button onClick={() => { const n = a.reportImages.filter((_, idx) => idx !== i); updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5"><X size={10}/></button></div>))}
               </div>
-              <textarea className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm mb-3 min-h-[100px] text-slate-900" placeholder={t.reportNotesPlaceholder} defaultValue={a.reportNotes} onBlur={(e) => updateApp(a.id, {reportNotes: e.target.value})} />
-              <div className="flex gap-2">
-                 <Button size="small" variant="secondary" icon={Printer} onClick={() => printAsPdf(generateReportText(a.reportNotes||"", a.customerName, a.date, a.category, lang), a.reportImages)}>{t.downloadPdf}</Button>
-                 <Button size="small" variant="secondary" icon={Download} onClick={() => downloadAsWord(generateReportText(a.reportNotes||"", a.customerName, a.date, a.category, lang), a.customerName, a.reportImages)}>{t.downloadDoc}</Button>
+              <div className="space-y-2">
+                  <textarea className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm min-h-[100px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    placeholder={t.reportNotesPlaceholder} 
+                    value={a.reportNotes || ''} 
+                    onChange={(e) => {
+                        // Optimistic typing
+                        setSelectedAppointment({...a, reportNotes: e.target.value});
+                    }}
+                  />
+                  <Button fullWidth onClick={() => handleReportUpdate(a.reportNotes || '')} icon={CheckCircle}>{t.generateBtn}</Button>
               </div>
+              
+              {a.finalReport && (
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.reportResultLabel}</label>
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono whitespace-pre-wrap mb-4 max-h-40 overflow-y-auto">{a.finalReport}</div>
+                      <div className="flex gap-2">
+                        <Button size="small" variant="secondary" icon={Printer} onClick={() => printAsPdf(a.finalReport, a.reportImages)}>{t.downloadPdf}</Button>
+                        <Button size="small" variant="secondary" icon={Download} onClick={() => downloadAsWord(a.finalReport, a.customerName, a.reportImages)}>{t.downloadDoc}</Button>
+                      </div>
+                  </div>
+              )}
            </Card>
 
            <div className="pt-8 pb-4"><Button fullWidth variant="danger" icon={Trash2} onClick={() => deleteApp(a.id)}>{t.delete}</Button></div>
@@ -320,7 +341,6 @@ export default function App() {
             <div className="max-w-3xl mx-auto space-y-3">{done.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">DONE</span></div>)}</div>
         ) : (
             <>
-              {/* DESKTOP VIEW */}
               {!isMobile && (
                   <div className="flex flex-row gap-4 h-full w-full">
                       <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
@@ -328,7 +348,6 @@ export default function App() {
                       <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
                   </div>
               )}
-              {/* MOBILE VIEW (Tabs List) */}
               {isMobile && (
                   <div className="pb-20">
                       <div className="flex p-1 bg-slate-200 rounded-xl mb-4 sticky top-0 z-10 shadow-sm">
