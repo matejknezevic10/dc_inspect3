@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote
+  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
@@ -14,13 +14,13 @@ try {
   } else {
     // HIER DEINE DATEN EINTRAGEN
     firebaseConfig = {
-      apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-      authDomain: "dc-inspect.firebaseapp.com",
-      projectId: "dc-inspect",
-      storageBucket: "dc-inspect.firebasestorage.app",
-      messagingSenderId: "639013498118",
-      appId: "1:639013498118:web:15146029fbc159cbd30287",
-      measurementId: "G-5TETMHQ1EW"
+  apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+  authDomain: "dc-inspect.firebaseapp.com",
+  projectId: "dc-inspect",
+  storageBucket: "dc-inspect.firebasestorage.app",
+  messagingSenderId: "639013498118",
+  appId: "1:639013498118:web:15146029fbc159cbd30287",
+  measurementId: "G-5TETMHQ1EW"
     };
   }
 } catch (e) { console.error("Config Error", e); }
@@ -76,31 +76,35 @@ const AppLogo = ({ size = "w-14 h-14", showFallback = true }) => {
 const translations = {
   hr: {
     appTitle: "DC INSPECT", subtitle: "Mobilni Asistent", newAppointment: "Novi Termin",
-    navDashboard: "Dashboard", navArchive: "Arhiv (Done)",
-    colIncoming: "NOVI / INCOMING", colPending: "U TIJEKU / PENDING", colDone: "ARHIVA / DONE",
+    navDashboard: "Dashboard", navArchive: "Arhiv",
+    colIncoming: "NOVI", colPending: "U TIJEKU", colDone: "ZAVRŠENO", colArchived: "ARHIVIRANO",
     emptyInbox: "Nema novih zadataka.", emptyPending: "Ništa nije u tijeku.", emptyArchive: "Arhiva je prazna.",
-    moveToPending: "Prebaci u tijek", moveToDone: "Završi (Arhiviraj)", restore: "Vrati u proces", moveToIncoming: "Vrati u nove",
-    reportTitle: "Service Bericht", addPhoto: "Dodaj sliku", 
+    moveToPending: "Prebaci u tijek", moveToDone: "Završi", restore: "Vrati u proces", moveToIncoming: "Vrati u nove",
+    moveToArchived: "Arhiviraj", restoreFromArchive: "Vrati u završeno",
+    reportTitle: "Servisno Izvješće", addPhoto: "Dodaj sliku", 
     labelCustomer: "Ime Klijenta", labelDate: "Datum", labelTime: "Vrijeme", labelCity: "Grad", labelAddress: "Adresa", labelRequest: "Opis", labelCategory: "Kategorija",
     save: "Spremi", delete: "Obriši", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Pokreni Navigaciju", gasButton: "Traži benzinske (GPS)", logisticsTitle: "Logistika", foodTitle: "Hrana", gasTitle: "Gorivo", gasDesc: "Cijene u blizini", confirmDelete: "Obrisati?",
     catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
     reportNotesPlaceholder: "- Kvar na ventilu...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja",
-    mobileTabIncoming: "Novi", mobileTabPending: "U Tijeku", mobileTabDone: "Gotovo"
+    mobileTabIncoming: "Novi", mobileTabPending: "U Tijeku", mobileTabDone: "Gotovo",
+    tasksTitle: "Pripreme / To-do"
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant", newAppointment: "New Task",
-    navDashboard: "Dashboard", navArchive: "Archive (Done)",
-    colIncoming: "INCOMING", colPending: "PENDING", colDone: "ARCHIVE / DONE",
+    navDashboard: "Dashboard", navArchive: "Archive",
+    colIncoming: "INCOMING", colPending: "PENDING", colDone: "DONE", colArchived: "ARCHIVED",
     emptyInbox: "No new tasks.", emptyPending: "Nothing pending.", emptyArchive: "Archive is empty.",
-    moveToPending: "Start Working", moveToDone: "Complete & Archive", restore: "Restore", moveToIncoming: "Move to Incoming",
+    moveToPending: "Start Working", moveToDone: "Complete", restore: "Restore", moveToIncoming: "Move to Incoming",
+    moveToArchived: "Archive", restoreFromArchive: "Restore to Done",
     reportTitle: "Service Report", addPhoto: "Add Photo",
     labelCustomer: "Customer", labelDate: "Date", labelTime: "Time", labelCity: "City", labelAddress: "Address", labelRequest: "Request", labelCategory: "Category",
     save: "Save", delete: "Delete", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Start Navigation", gasButton: "Search Gas Stations (GPS)", logisticsTitle: "Logistics", foodTitle: "Food", gasTitle: "Fuel", gasDesc: "Prices nearby", confirmDelete: "Delete?",
     catInspection: "Inspection", catConsulting: "Consulting", catEmergency: "Emergency",
     reportNotesPlaceholder: "- Valve broken...", generateBtn: "Generate Report", reportResultLabel: "Report Preview",
-    mobileTabIncoming: "Incoming", mobileTabPending: "Pending", mobileTabDone: "Done"
+    mobileTabIncoming: "Incoming", mobileTabPending: "Pending", mobileTabDone: "Done",
+    tasksTitle: "Preparation / To-do before taking over"
   }
 };
 
@@ -112,32 +116,60 @@ const printAsPdf = (c,i=[]) => { const w=window.open('','_blank'); if(w){w.docum
 const generateReportText = (n,c,d,cat,l) => { const ds=new Date(d).toLocaleDateString(); return l==='hr' ? `IZVJEŠTAJ\nKlijent: ${c}\nDatum: ${ds}\nKategorija: ${cat}\n\nNALAZI I RADOVI:\n${n}` : `REPORT\nClient: ${c}\nDate: ${ds}\nCategory: ${cat}\n\nFINDINGS:\n${n}`; };
 const generateRouteRestaurants = (city, lang) => { return [ { name: "Highway Rest Stop A1", type: "Rest Stop", dist: "On Route" }, { name: `Grill House ${city}`, type: "Local Food", dist: "2 min detour" }, { name: "Coffee & Drive", type: "Snack", dist: "On Route" } ]; };
 
+// Generiert Zeit-Slots in 15-Minuten Schritten
+const generateTimeSlots = () => {
+  const slots = [];
+  for (let i = 6; i <= 22; i++) {
+    for (let j = 0; j < 60; j += 15) {
+      const hour = i.toString().padStart(2, '0');
+      const minute = j.toString().padStart(2, '0');
+      slots.push({ value: `${hour}:${minute}`, label: `${hour}:${minute}` });
+    }
+  }
+  return slots;
+};
+const timeOptions = generateTimeSlots();
+
 // UI Components
 const Card = ({children, className='', onClick}) => (<div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>{children}</div>);
-const Button = ({children, onClick, variant='primary', className='', icon:Icon, ...p}) => {
-  const vs = { primary: "bg-blue-600 text-white hover:bg-blue-700", secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50", success: "bg-green-600 text-white hover:bg-green-700", danger: "bg-red-50 text-red-600 hover:bg-red-100", orange: "bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100" };
-  return <button onClick={onClick} className={`flex items-center justify-center px-4 py-3 rounded-lg font-bold text-sm transition-all active:scale-95 ${vs[variant]} ${className}`} {...p}>{Icon && <Icon size={18} className="mr-2"/>}{children}</button>;
-};
-const Input = ({label, ...p}) => (<div className="mb-3"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label><input className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" {...p}/></div>);
 
-const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange }) => {
+const Button = ({children, onClick, variant='primary', className='', icon:Icon, fullWidth, ...p}) => {
+  const vs = { primary: "bg-blue-600 text-white hover:bg-blue-700", secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50", success: "bg-green-600 text-white hover:bg-green-700", danger: "bg-red-50 text-red-600 hover:bg-red-100", orange: "bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100", gray: "bg-slate-200 text-slate-700 hover:bg-slate-300" };
+  return <button onClick={onClick} className={`flex items-center justify-center px-4 py-3 rounded-lg font-bold text-sm transition-all active:scale-95 ${vs[variant]} ${fullWidth ? 'w-full' : ''} ${className}`} {...p}>{Icon && <Icon size={18} className="mr-2"/>}{children}</button>;
+};
+
+const Input = ({label, ...p}) => (<div className="mb-3"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label><input className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" {...p}/></div>);
+const Select = ({ label, options, ...props }) => (
+  <div className="mb-4">
+    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label>
+    <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-900" {...props}>
+      {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+    </select>
+  </div>
+);
+
+const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange, isMobile }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const handleDragOver = (e) => { e.preventDefault(); setIsDragOver(true); };
   const handleDragLeave = (e) => { e.preventDefault(); setIsDragOver(false); };
   const handleDrop = (e) => { e.preventDefault(); setIsDragOver(false); const id = e.dataTransfer.getData("appId"); if(id) onStatusChange(id, status); };
 
+  const containerClasses = isMobile 
+    ? `flex-1 flex flex-col rounded-2xl border border-slate-200/60 transition-all duration-200 overflow-hidden h-[500px]`
+    : `flex-1 flex flex-col h-full transition-all duration-200 overflow-hidden`;
+
+  const bgClass = isDragOver ? 'bg-blue-50' : (isMobile ? 'bg-slate-50/50' : 'bg-slate-50');
+
   return (
-    // WICHTIG: h-full und flex-1 sorgen für maximale Höhe
     <div 
         onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} 
-        className={`flex-1 flex flex-col rounded-2xl border transition-all duration-200 overflow-hidden h-full
-        ${isDragOver?'bg-blue-50 border-blue-300 ring-2 ring-blue-100':'bg-slate-100/50 border-slate-200/60'}`}
+        className={`${containerClasses} ${bgClass}`}
     >
-      <div className={`p-3 font-bold text-xs uppercase tracking-wider border-b border-slate-200 flex justify-between items-center flex-shrink-0 ${status==='incoming'?'text-blue-600 bg-blue-50/50':status==='pending'?'text-orange-600 bg-orange-50/50':'text-green-600 bg-green-50/50'}`}>
+      <div className={`p-4 font-bold text-xs uppercase tracking-wider border-b border-slate-200 flex justify-between items-center flex-shrink-0 bg-white/50 backdrop-blur-sm ${status==='incoming'?'text-blue-600':status==='pending'?'text-orange-600':'text-green-600'}`}>
         {title} <span className="bg-white px-2 py-0.5 rounded-full text-[10px] shadow-sm text-slate-600">{appointments.length}</span>
       </div>
-      <div className="p-2 overflow-y-auto flex-1 space-y-2 custom-scrollbar">
-        {appointments.length===0 ? <div className="text-center py-8 text-slate-300 italic text-xs">{isDragOver?'Drop here':'Empty'}</div> : appointments.map(app => (
+      <div className="p-3 overflow-y-auto flex-1 space-y-3 custom-scrollbar">
+        {appointments.length===0 ? <div className="text-center py-10 text-slate-300 italic text-xs">{isDragOver?'Drop here':'Empty'}</div> : appointments.map(app => (
             <div key={app.id} draggable onDragStart={(e)=>{e.dataTransfer.setData("appId",app.id);e.dataTransfer.effectAllowed="move";}} onClick={()=>onClickApp(app)} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98] group relative">
               <div className="flex justify-between items-start mb-1"><h4 className="font-bold text-slate-800 text-sm">{app.customerName}</h4><span className="text-[10px] font-medium bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded">{new Date(app.date).toLocaleDateString()}</span></div>
               <div className="flex items-center text-xs text-slate-500 gap-1 mb-2"><MapPin size={10}/> {app.city} <span className="mx-1">•</span> <span>{app.category}</span></div>
@@ -156,13 +188,12 @@ export default function App() {
   const [view, setView] = useState('dashboard');
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [filter, setFilter] = useState('');
-  const [lang, setLang] = useState('hr');
+  const [lang, setLang] = useState('en'); // DEFAULT LANGUAGE CHANGED TO 'en'
   const t = translations[lang];
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [mobileTab, setMobileTab] = useState('incoming');
   const [foodData, setFoodData] = useState([]);
   const fileInputRef = useRef(null);
-  const [formData, setFormData] = useState({ customerName: '', city: '', address: '', date: '', time: '', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [] });
+  const [formData, setFormData] = useState({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [] });
 
   // --- SPLASH SCREEN STATE ---
   const [showSplash, setShowSplash] = useState(true);
@@ -184,9 +215,7 @@ export default function App() {
         } else {
           await signInAnonymously(auth);
         }
-      } catch (error) {
-        console.error("Auth Error:", error);
-      }
+      } catch (error) { console.error("Auth Error:", error); }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, setUser);
@@ -222,6 +251,8 @@ export default function App() {
   const incoming = appointments.filter(a => (a.status === 'incoming' || !a.status) && filterFn(a));
   const pending = appointments.filter(a => a.status === 'pending' && filterFn(a));
   const done = appointments.filter(a => a.status === 'done' && filterFn(a));
+  // ARCHIVED list
+  const archived = appointments.filter(a => a.status === 'archived' && filterFn(a));
 
   useEffect(() => {
     if (selectedAppointment && view === 'detail') {
@@ -232,10 +263,7 @@ export default function App() {
   // --- SPLASH SCREEN RENDER ---
   if (showSplash) {
     return (
-      <div 
-        onClick={() => setShowSplash(false)} 
-        className="fixed inset-0 z-50 bg-blue-600 flex flex-col items-center justify-center text-white cursor-pointer transition-opacity duration-500"
-      >
+      <div onClick={() => setShowSplash(false)} className="fixed inset-0 z-50 bg-blue-600 flex flex-col items-center justify-center text-white cursor-pointer transition-opacity duration-500">
         <div className="transform transition-transform duration-700 hover:scale-105 flex flex-col items-center">
            <AppLogo size="w-40 h-40" showFallback={true} /> 
            <h1 className="text-4xl font-black mt-6 mb-2 tracking-tighter">DC INSPECT</h1>
@@ -261,7 +289,7 @@ export default function App() {
             <Input label={t.labelCustomer} value={formData.customerName} onChange={e=>setFormData({...formData, customerName:e.target.value})} />
             <div className="grid grid-cols-2 gap-3">
                 <Input label={t.labelDate} type="date" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} />
-                <Input label={t.labelTime} type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} />
+                <Select label={t.labelTime} options={timeOptions} value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} />
             </div>
             <Input label={t.labelCity} value={formData.city} onChange={e=>setFormData({...formData, city:e.target.value})} />
             <Input label={t.labelAddress} value={formData.address} onChange={e=>setFormData({...formData, address:e.target.value})} />
@@ -282,12 +310,15 @@ export default function App() {
         setSelectedAppointment({ ...a, reportNotes: noteText, finalReport: finalText });
     };
 
+    const statusColor = a.status==='archived' ? 'bg-slate-500' : a.status==='done' ? 'bg-green-600' : a.status==='pending' ? 'bg-orange-500' : 'bg-blue-600';
+    const statusLabel = a.status === 'incoming' ? t.colIncoming : a.status === 'pending' ? t.colPending : a.status === 'done' ? t.colDone : t.colArchived;
+
     return (
       <div className="min-h-screen bg-slate-50 pb-24 font-sans text-slate-900">
-        <div className={`text-white px-4 pt-4 pb-16 shadow-md ${a.status==='done'?'bg-green-600':a.status==='pending'?'bg-orange-500':'bg-blue-600'}`}>
+        <div className={`text-white px-4 pt-4 pb-16 shadow-md ${statusColor}`}>
            <div className="flex justify-between items-start mb-4 max-w-4xl mx-auto w-full">
-             <button onClick={() => setView('dashboard')} className="p-2 bg-white/20 rounded-lg hover:bg-white/30"><ArrowLeft size={20}/></button>
-             <span className="text-xs font-bold uppercase bg-black/20 px-3 py-1 rounded-full">{a.status === 'incoming' ? t.colIncoming : a.status === 'pending' ? t.colPending : t.colDone}</span>
+             <button onClick={() => setView(a.status === 'archived' ? 'archive' : 'dashboard')} className="p-2 bg-white/20 rounded-lg hover:bg-white/30"><ArrowLeft size={20}/></button>
+             <span className="text-xs font-bold uppercase bg-black/20 px-3 py-1 rounded-full">{statusLabel}</span>
            </div>
            <div className="max-w-4xl mx-auto">
              <h1 className="text-2xl font-bold mb-1">{a.customerName}</h1>
@@ -296,11 +327,19 @@ export default function App() {
         </div>
 
         <div className="px-4 -mt-10 relative z-10 w-full max-w-4xl mx-auto space-y-4">
+           {/* STATUS BUTTONS */}
            <Card className="p-3 grid grid-cols-2 gap-3">
               {a.status === 'incoming' && <Button variant="orange" onClick={() => handleUpdateStatus(a.id, 'pending')}>{t.moveToPending}</Button>}
               {a.status === 'pending' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'incoming')} icon={Undo}>{t.moveToIncoming}</Button>}
               {a.status === 'pending' && <Button variant="success" onClick={() => handleUpdateStatus(a.id, 'done')}>{t.moveToDone}</Button>}
+              
+              {/* DONE STATUS ACTIONS */}
               {a.status === 'done' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'pending')} icon={Undo}>{t.restore}</Button>}
+              {a.status === 'done' && <Button variant="gray" onClick={() => handleUpdateStatus(a.id, 'archived')} icon={FolderArchive}>{t.moveToArchived}</Button>}
+
+              {/* ARCHIVED STATUS ACTIONS */}
+              {a.status === 'archived' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'done')} icon={Undo}>{t.restoreFromArchive}</Button>}
+
               <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} icon={Navigation}>{t.navStart}</Button>
            </Card>
 
@@ -310,11 +349,9 @@ export default function App() {
              <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-medium border border-slate-200">{getCategoryLabel(a.category)}</span>
            </Card>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card>
-              <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100"><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card>
-           </div>
+           <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
 
+           {/* TASKS SECTION MOVED UP */}
            <Card className="p-0 overflow-hidden">
              <div className="p-4 bg-slate-50/50 border-b border-slate-200 flex justify-between"><h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckSquare size={18} className="text-blue-500"/> {t.tasksTitle}</h3></div>
              <div className="divide-y divide-slate-100">
@@ -327,6 +364,12 @@ export default function App() {
                <div className="p-3"><input className="w-full bg-slate-50 p-2 rounded border border-slate-200 text-sm" placeholder={t.taskPlaceholder} onKeyDown={(e)=>{ if(e.key==='Enter'){ const n=[...(a.todos||[]), {text:e.target.value, done:false}]; updateApp(a.id, {todos: n}); setSelectedAppointment({...a, todos:n}); e.target.value=''; }}}/></div>
              </div>
            </Card>
+
+           {/* LOGISTICS SECTION MOVED DOWN */}
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card>
+              <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100"><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card>
+           </div>
 
            <Card className="p-4">
               <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><FileText size={16}/> {t.reportTitle}</h3>
@@ -341,7 +384,6 @@ export default function App() {
                     placeholder={t.reportNotesPlaceholder} 
                     value={a.reportNotes || ''} 
                     onChange={(e) => {
-                        // Optimistic typing
                         setSelectedAppointment({...a, reportNotes: e.target.value});
                     }}
                   />
@@ -383,40 +425,40 @@ export default function App() {
 
       <div className="px-4 py-2 bg-white border-b border-slate-100 z-10 flex-shrink-0"><div className="relative"><SearchIcon className="absolute left-3 top-3 text-slate-400" size={16}/><input placeholder={t.searchPlaceholder} value={filter} onChange={e => setFilter(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all text-slate-900" /></div></div>
 
-      {/* MAIN CONTENT: REMOVED PADDING ON WRAPPER */}
       <div className="flex-1 overflow-hidden relative w-full bg-slate-50">
         {view === 'archive' ? (
-            <div className="max-w-3xl mx-auto space-y-3 p-4 overflow-y-auto h-full">{done.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">DONE</span></div>)}</div>
+            <div className="max-w-3xl mx-auto space-y-3 p-4 overflow-y-auto h-full custom-scrollbar">
+                {archived.length === 0 ? <div className="text-center py-10 text-slate-300 italic">{t.emptyArchive}</div> : archived.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-slate-500 text-white px-2 py-1 rounded">ARCHIVED</span></div>)}
+            </div>
         ) : (
             <>
-              {/* DESKTOP VIEW: FULL WIDTH, NO PADDING */}
+              {/* DESKTOP VIEW: Edge to Edge Columns */}
               {!isMobile && (
-                  <div className="flex flex-row gap-0 h-full w-full divide-x divide-slate-200">
-                      {/* Added minimal padding INSIDE columns via gap or internal padding if needed, but requested 'edge to edge' */}
+                  <div className="flex flex-row h-full w-full divide-x divide-slate-200">
                       <div className="flex-1 h-full p-2">
-                        <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                        <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
                       </div>
                       <div className="flex-1 h-full p-2">
-                        <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                        <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
                       </div>
                       <div className="flex-1 h-full p-2">
-                        <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                        <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
                       </div>
                   </div>
               )}
-              {/* MOBILE VIEW (Stacked) WITH PADDING */}
+              {/* MOBILE VIEW: Stacked with Padding */}
               {isMobile && (
-                  <div className="flex flex-col gap-4 p-4 overflow-y-auto h-full">
-                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
-                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
-                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                  <div className="flex flex-col gap-4 p-4 overflow-y-auto h-full custom-scrollbar">
+                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} />
+                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} />
+                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} />
                   </div>
               )}
             </>
         )}
       </div>
 
-      <div className="fixed bottom-6 right-6 z-30"><button onClick={() => { setFormData({ customerName: '', city: '', address: '', date: '', time: '', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [] }); setView('add'); }} className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl shadow-blue-200 flex items-center justify-center transition-transform active:scale-90"><Plus size={28} /></button></div>
+      <div className="fixed bottom-6 right-6 z-30"><button onClick={() => { setFormData({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [] }); setView('add'); }} className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl shadow-blue-200 flex items-center justify-center transition-transform active:scale-90"><Plus size={28} /></button></div>
       <style>{`.custom-scrollbar::-webkit-scrollbar{height:4px;width:4px}.custom-scrollbar::-webkit-scrollbar-track{background:transparent}.custom-scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}`}</style>
     </div>
   );
