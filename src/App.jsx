@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive
+  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive, Wand2
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
@@ -86,7 +86,7 @@ const translations = {
     save: "Spremi", delete: "Obriši", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Pokreni Navigaciju", gasButton: "Traži benzinske (GPS)", logisticsTitle: "Logistika", foodTitle: "Hrana", gasTitle: "Gorivo", gasDesc: "Cijene u blizini", confirmDelete: "Obrisati?",
     catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
-    reportNotesPlaceholder: "- Kvar na ventilu...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja",
+    reportNotesPlaceholder: "Unesite natuknice (npr. 'ventil curi', 'sve ok')...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja",
     mobileTabIncoming: "Novi", mobileTabPending: "U Tijeku", mobileTabDone: "Gotovo",
     tasksTitle: "Pripreme / To-do",
     defaultTask1: "Pripremi alat (Lampa, Ljestve, Vlagomjer)",
@@ -106,7 +106,7 @@ const translations = {
     save: "Save", delete: "Delete", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Start Navigation", gasButton: "Search Gas Stations (GPS)", logisticsTitle: "Logistics", foodTitle: "Food", gasTitle: "Fuel", gasDesc: "Prices nearby", confirmDelete: "Delete?",
     catInspection: "Inspection", catConsulting: "Consulting", catEmergency: "Emergency",
-    reportNotesPlaceholder: "- Valve broken...", generateBtn: "Generate Report", reportResultLabel: "Report Preview",
+    reportNotesPlaceholder: "Enter keywords (e.g. 'valve leaking', 'all ok')...", generateBtn: "Generate Smart Report", reportResultLabel: "Report Preview",
     mobileTabIncoming: "Incoming", mobileTabPending: "Pending", mobileTabDone: "Done",
     tasksTitle: "Preparation / To-do before taking over",
     defaultTask1: "Prepare tools (Flashlight, Ladder, Moisture meter)",
@@ -120,35 +120,139 @@ const translations = {
 const safeOpen = (url) => { if(!url) return; const w = window.open(url, '_blank'); if(!w || w.closed) { window.location.href = url; } };
 const compressImage = (file) => new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const cvs = document.createElement('canvas'); const max = 1000; let w = img.width, h = img.height; if(w>h){if(w>max){h*=max/w;w=max;}}else{if(h>max){w*=max/h;h=max;}} cvs.width=w; cvs.height=h; const ctx = cvs.getContext('2d'); ctx.drawImage(img,0,0,w,h); resolve(cvs.toDataURL('image/jpeg', 0.6)); } } });
 const downloadAsWord = (c,f,i=[]) => { let h=`<html><body><div style="font-family:Arial;white-space:pre-wrap;">${c}</div>${i.map(u=>`<p><img src="${u}" width="400"/></p>`).join('')}</body></html>`; const b=new Blob(['\ufeff',h],{type:'application/msword'}); const u=URL.createObjectURL(b); const l=document.createElement('a'); l.href=u; l.download=`${f}.doc`; document.body.appendChild(l); l.click(); document.body.removeChild(l); };
-const printAsPdf = (c,i=[]) => { const w=window.open('','_blank'); if(w){w.document.write(`<html><head><style>body{font-family:Arial;padding:20px;white-space:pre-wrap}img{max-width:100%;max-height:300px;margin:10px}</style></head><body><div>${c}</div><div>${i.map(u=>`<img src="${u}"/>`).join('')}</div></body></html>`); w.document.close(); setTimeout(()=>w.print(),500);} };
-const generateReportText = (n,c,d,cat,l) => { const ds=new Date(d).toLocaleDateString(); return l==='hr' ? `IZVJEŠTAJ\nKlijent: ${c}\nDatum: ${ds}\nKategorija: ${cat}\n\nNALAZI I RADOVI:\n${n}` : `REPORT\nClient: ${c}\nDate: ${ds}\nCategory: ${cat}\n\nFINDINGS:\n${n}`; };
 
-const generateRouteRestaurants = (city, lang) => { 
-  const t = lang === 'hr' ? {
-    restStop: "Odmorište", local: "Domaća hrana", snack: "Zalogajnica", onRoute: "Na ruti", detour: "2 min skretanja"
-  } : {
-    restStop: "Rest Stop", local: "Local Food", snack: "Snack", onRoute: "On Route", detour: "2 min detour"
-  };
+// --- Smart Report Logic ---
+const generateReportText = (notes, customerName, date, category, lang) => {
+  const dateStr = new Date(date).toLocaleDateString(lang === 'hr' ? 'hr-HR' : 'en-US');
+  
+  const lines = notes.split('\n').filter(l => l.trim() !== '');
+  const formattedLines = lines.map(line => {
+    let cleanLine = line.replace(/^-\s*/, '').trim();
+    const isIssue = cleanLine.toLowerCase().match(/(kaputt|defekt|broken|fail|error|leak|curi|kvar|schaden|damage|missing|fali|nedostaje)/);
+    const prefix = isIssue ? (lang === 'hr' ? "⚠️ NEDOSTATAK: " : "⚠️ ISSUE: ") : "• ";
+    return prefix + cleanLine.charAt(0).toUpperCase() + cleanLine.slice(1);
+  });
 
-  return [
-    { name: "Highway Rest Stop A1", type: t.restStop, dist: t.onRoute },
-    { name: `Grill House ${city}`, type: t.local, dist: t.detour },
-    { name: "Coffee & Drive", type: t.snack, dist: t.onRoute }
-  ]; 
-};
+  if (lang === 'hr') {
+    return `SERVISNO IZVJEŠĆE
+--------------------------------------------------
+Klijent:    ${customerName}
+Datum:      ${dateStr}
+Kategorija: ${category.toUpperCase()}
+Status:     ZAVRŠENO
+--------------------------------------------------
 
-// Generiert Zeit-Slots in 15-Minuten Schritten
-const generateTimeSlots = () => {
-  const slots = [];
-  for (let i = 6; i <= 22; i++) {
-    for (let j = 0; j < 60; j += 15) {
-      const hour = i.toString().padStart(2, '0');
-      const minute = j.toString().padStart(2, '0');
-      slots.push({ value: `${hour}:${minute}`, label: `${hour}:${minute}` });
-    }
+POŠTOVANI,
+
+Ovim putem dostavljamo službeno izvješće o izvršenim radovima na navedenoj lokaciji.
+Naš stručni tim izvršio je detaljan pregled sukladno standardima struke.
+
+DETALJNI NALAZI I RADOVI:
+${formattedLines.length > 0 ? formattedLines.join('\n') : "• Nisu zabilježene posebne napomene tijekom pregleda."}
+
+ZAKLJUČAK:
+Sustav je ispitan i trenutno se nalazi u funkcionalnom stanju, uzimajući u obzir gore navedene napomene.
+Za sva dodatna pitanja stojimo Vam na raspolaganju.
+
+--------------------------------------------------
+DC Inspect d.o.o.
+Potpis servisera: __________________
+`;
+  } else {
+    return `SERVICE REPORT
+--------------------------------------------------
+Client:     ${customerName}
+Date:       ${dateStr}
+Category:   ${category.toUpperCase()}
+Status:     COMPLETED
+--------------------------------------------------
+
+DEAR CUSTOMER,
+
+We hereby submit the official report on the work performed at the specified location.
+Our team has conducted a detailed inspection in accordance with professional standards.
+
+DETAILED FINDINGS & ACTIONS:
+${formattedLines.length > 0 ? formattedLines.join('\n') : "• No specific notes recorded during inspection."}
+
+CONCLUSION:
+The system has been tested and is currently in functional condition, considering the notes above.
+We remain available for any further questions.
+
+--------------------------------------------------
+DC Inspect Ltd.
+Technician Signature: __________________
+`;
   }
-  return slots;
 };
+
+// --- Professional PDF Template ---
+const printAsPdf = (content, images = []) => {
+  const printWindow = window.open('', '_blank');
+  const logoHtml = `<div style="background:#2563EB;color:white;width:50px;height:50px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:20px;">DC</div>`;
+
+  if (printWindow) {
+      printWindow.document.write(`
+          <html>
+              <head>
+                  <title>Service Report</title>
+                  <style>
+                      body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+                      .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563EB; padding-bottom: 20px; margin-bottom: 30px; }
+                      .company-info { text-align: right; font-size: 12px; color: #666; }
+                      .company-name { font-weight: bold; color: #2563EB; font-size: 18px; margin-bottom: 5px; }
+                      .content { white-space: pre-wrap; font-size: 14px; }
+                      .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; font-size: 10px; text-align: center; color: #888; }
+                      .gallery { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                      .gallery img { width: 100%; height: 200px; object-fit: cover; border: 1px solid #ddd; border-radius: 4px; }
+                      @media print {
+                          body { -webkit-print-color-adjust: exact; }
+                          .gallery { page-break-before: auto; }
+                      }
+                  </style>
+              </head>
+              <body>
+                  <div class="header">
+                      <div class="logo">
+                          ${logoHtml}
+                          <div style="margin-top:5px;font-weight:bold;color:#2563EB;">DC INSPECT</div>
+                      </div>
+                      <div class="company-info">
+                          <div class="company-name">DC Inspect GmbH</div>
+                          Musterstraße 123<br>
+                          10000 Zagreb, Croatia<br>
+                          Tel: +385 91 123 4567<br>
+                          Email: office@dc-inspect.com
+                      </div>
+                  </div>
+
+                  <div class="content">${content}</div>
+
+                  ${images.length > 0 ? `
+                      <div style="margin-top:30px; page-break-inside: avoid;">
+                          <h4 style="border-bottom:1px solid #ccc; padding-bottom:5px; margin-bottom:15px;">FOTODOKUMENTACIJA / PHOTO LOG</h4>
+                          <div class="gallery">
+                              ${images.map(u => `<div><img src="${u}"/></div>`).join('')}
+                          </div>
+                      </div>
+                  ` : ''}
+
+                  <div class="footer">
+                      DC Inspect App • Generated automatically • www.dc-inspect.com
+                  </div>
+              </body>
+          </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => { printWindow.print(); }, 1000);
+  } else {
+      alert("Please allow popups.");
+  }
+};
+
+const generateRouteRestaurants = (city, lang) => { return [ { name: "Highway Rest Stop A1", type: "Rest Stop", dist: "On Route" }, { name: `Grill House ${city}`, type: "Local Food", dist: "2 min detour" }, { name: "Coffee & Drive", type: "Snack", dist: "On Route" } ]; };
+const generateTimeSlots = () => { const slots = []; for (let i = 6; i <= 22; i++) { for (let j = 0; j < 60; j += 15) { const hour = i.toString().padStart(2, '0'); const minute = j.toString().padStart(2, '0'); slots.push({ value: `${hour}:${minute}`, label: `${hour}:${minute}` }); } } return slots; };
 const timeOptions = generateTimeSlots();
 
 // UI Components
@@ -278,7 +382,6 @@ export default function App() {
   const incoming = appointments.filter(a => (a.status === 'incoming' || !a.status) && filterFn(a));
   const pending = appointments.filter(a => a.status === 'pending' && filterFn(a));
   const done = appointments.filter(a => a.status === 'done' && filterFn(a));
-  // ARCHIVED list
   const archived = appointments.filter(a => a.status === 'archived' && filterFn(a));
 
   useEffect(() => {
@@ -359,12 +462,8 @@ export default function App() {
               {a.status === 'incoming' && <Button variant="orange" onClick={() => handleUpdateStatus(a.id, 'pending')}>{t.moveToPending}</Button>}
               {a.status === 'pending' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'incoming')} icon={Undo}>{t.moveToIncoming}</Button>}
               {a.status === 'pending' && <Button variant="success" onClick={() => handleUpdateStatus(a.id, 'done')}>{t.moveToDone}</Button>}
-              
-              {/* DONE STATUS ACTIONS */}
               {a.status === 'done' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'pending')} icon={Undo}>{t.restore}</Button>}
               {a.status === 'done' && <Button variant="gray" onClick={() => handleUpdateStatus(a.id, 'archived')} icon={FolderArchive}>{t.moveToArchived}</Button>}
-
-              {/* ARCHIVED STATUS ACTIONS */}
               {a.status === 'archived' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'done')} icon={Undo}>{t.restoreFromArchive}</Button>}
            </Card>
 
@@ -373,6 +472,8 @@ export default function App() {
              <p className="text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">{a.request}</p>
              <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-medium border border-slate-200">{getCategoryLabel(a.category)}</span>
            </Card>
+
+           <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
 
            {/* TASKS SECTION MOVED UP */}
            <Card className="p-0 overflow-hidden">
@@ -388,9 +489,6 @@ export default function App() {
              </div>
            </Card>
 
-           {/* NAVIGATION BUTTON MOVED HERE */}
-           <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
-
            {/* LOGISTICS SECTION MOVED DOWN */}
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card>
@@ -398,13 +496,8 @@ export default function App() {
                   <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3>
                   <div className="space-y-2">
                       {foodData.map((f, i) => (
-                          <div 
-                            key={i} 
-                            className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                            onClick={() => triggerStationNav(f.name, a.city)}
-                          >
-                              <span>{f.name}</span>
-                              <span className="text-slate-400">{f.dist}</span>
+                          <div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => triggerStationNav(f.name, a.city)}>
+                              <span>{f.name}</span><span className="text-slate-400">{f.dist}</span>
                           </div>
                       ))}
                   </div>
@@ -427,9 +520,8 @@ export default function App() {
                         setSelectedAppointment({...a, reportNotes: e.target.value});
                     }}
                   />
-                  <Button fullWidth onClick={() => handleReportUpdate(a.reportNotes || '')} icon={CheckCircle}>{t.generateBtn}</Button>
+                  <Button fullWidth onClick={() => handleReportUpdate(a.reportNotes || '')} icon={Wand2}>{t.generateBtn}</Button>
               </div>
-              
               {a.finalReport && (
                   <div className="mt-4 pt-4 border-t border-slate-100">
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.reportResultLabel}</label>
