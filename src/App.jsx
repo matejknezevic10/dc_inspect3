@@ -21,7 +21,7 @@ try {
       messagingSenderId: "639013498118",
       appId: "1:639013498118:web:15146029fbc159cbd30287",
       measurementId: "G-5TETMHQ1EW"
-     };
+    };
   }
 } catch (e) { console.error("Config Error", e); }
 
@@ -87,7 +87,12 @@ const translations = {
     navStart: "Pokreni Navigaciju", gasButton: "Traži benzinske (GPS)", logisticsTitle: "Logistika", foodTitle: "Hrana", gasTitle: "Gorivo", gasDesc: "Cijene u blizini", confirmDelete: "Obrisati?",
     catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
     reportNotesPlaceholder: "- Kvar na ventilu...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja",
-    tasksTitle: "Pripreme / To-do"
+    mobileTabIncoming: "Novi", mobileTabPending: "U Tijeku", mobileTabDone: "Gotovo",
+    tasksTitle: "Pripreme / To-do",
+    defaultTask1: "Pripremi alat (Lampa, Ljestve, Vlagomjer)",
+    defaultTask2: "Pregledaj dokumentaciju i nacrte",
+    defaultTask3: "Provjeri ključeve i šifre za ulaz",
+    defaultTask4: "Provjeri zaštitnu opremu"
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant", newAppointment: "New Task",
@@ -102,7 +107,12 @@ const translations = {
     navStart: "Start Navigation", gasButton: "Search Gas Stations (GPS)", logisticsTitle: "Logistics", foodTitle: "Food", gasTitle: "Fuel", gasDesc: "Prices nearby", confirmDelete: "Delete?",
     catInspection: "Inspection", catConsulting: "Consulting", catEmergency: "Emergency",
     reportNotesPlaceholder: "- Valve broken...", generateBtn: "Generate Report", reportResultLabel: "Report Preview",
-    tasksTitle: "Preparation / To-do before taking over"
+    mobileTabIncoming: "Incoming", mobileTabPending: "Pending", mobileTabDone: "Done",
+    tasksTitle: "Preparation / To-do before taking over",
+    defaultTask1: "Prepare tools (Flashlight, Ladder, Moisture meter)",
+    defaultTask2: "Review property documents & blueprints",
+    defaultTask3: "Check keys and access codes",
+    defaultTask4: "Check safety gear"
   }
 };
 
@@ -112,7 +122,20 @@ const compressImage = (file) => new Promise((resolve) => { const reader = new Fi
 const downloadAsWord = (c,f,i=[]) => { let h=`<html><body><div style="font-family:Arial;white-space:pre-wrap;">${c}</div>${i.map(u=>`<p><img src="${u}" width="400"/></p>`).join('')}</body></html>`; const b=new Blob(['\ufeff',h],{type:'application/msword'}); const u=URL.createObjectURL(b); const l=document.createElement('a'); l.href=u; l.download=`${f}.doc`; document.body.appendChild(l); l.click(); document.body.removeChild(l); };
 const printAsPdf = (c,i=[]) => { const w=window.open('','_blank'); if(w){w.document.write(`<html><head><style>body{font-family:Arial;padding:20px;white-space:pre-wrap}img{max-width:100%;max-height:300px;margin:10px}</style></head><body><div>${c}</div><div>${i.map(u=>`<img src="${u}"/>`).join('')}</div></body></html>`); w.document.close(); setTimeout(()=>w.print(),500);} };
 const generateReportText = (n,c,d,cat,l) => { const ds=new Date(d).toLocaleDateString(); return l==='hr' ? `IZVJEŠTAJ\nKlijent: ${c}\nDatum: ${ds}\nKategorija: ${cat}\n\nNALAZI I RADOVI:\n${n}` : `REPORT\nClient: ${c}\nDate: ${ds}\nCategory: ${cat}\n\nFINDINGS:\n${n}`; };
-const generateRouteRestaurants = (city, lang) => { return [ { name: "Highway Rest Stop A1", type: "Rest Stop", dist: "On Route" }, { name: `Grill House ${city}`, type: "Local Food", dist: "2 min detour" }, { name: "Coffee & Drive", type: "Snack", dist: "On Route" } ]; };
+
+const generateRouteRestaurants = (city, lang) => { 
+  const t = lang === 'hr' ? {
+    restStop: "Odmorište", local: "Domaća hrana", snack: "Zalogajnica", onRoute: "Na ruti", detour: "2 min skretanja"
+  } : {
+    restStop: "Rest Stop", local: "Local Food", snack: "Snack", onRoute: "On Route", detour: "2 min detour"
+  };
+
+  return [
+    { name: "Highway Rest Stop A1", type: t.restStop, dist: t.onRoute },
+    { name: `Grill House ${city}`, type: t.local, dist: t.detour },
+    { name: "Coffee & Drive", type: t.snack, dist: t.onRoute }
+  ]; 
+};
 
 // Generiert Zeit-Slots in 15-Minuten Schritten
 const generateTimeSlots = () => {
@@ -146,15 +169,12 @@ const Select = ({ label, options, ...props }) => (
   </div>
 );
 
-// Updated KanbanColumn to handle mobile stacking and full-width desktop
 const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange, isMobile }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const handleDragOver = (e) => { e.preventDefault(); setIsDragOver(true); };
   const handleDragLeave = (e) => { e.preventDefault(); setIsDragOver(false); };
   const handleDrop = (e) => { e.preventDefault(); setIsDragOver(false); const id = e.dataTransfer.getData("appId"); if(id) onStatusChange(id, status); };
 
-  // Desktop: No rounding, no border (handled by parent divider), full height
-  // Mobile: Rounded, Border, Fixed height or Auto
   const containerClasses = isMobile 
     ? `flex-1 flex flex-col rounded-2xl border border-slate-200/60 transition-all duration-200 overflow-hidden min-h-[400px]`
     : `flex-1 flex flex-col h-full transition-all duration-200 overflow-hidden`;
@@ -238,7 +258,12 @@ export default function App() {
   const saveApp = async (data) => {
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'appointments'), { 
         ...data, status: 'incoming', createdAt: serverTimestamp(), reportImages:[],
-        todos: [{text: "Werkzeug 1 / Alat 1", done: false}, {text: "Werkzeug 2 / Alat 2", done: false}, {text: "Dokumente", done: false}]
+        todos: [
+          { text: t.defaultTask1, done: false },
+          { text: t.defaultTask2, done: false },
+          { text: t.defaultTask3, done: false },
+          { text: t.defaultTask4, done: false }
+        ]
     });
     setView('dashboard');
   };
@@ -247,6 +272,7 @@ export default function App() {
   
   const handleUpdateStatus = (id, s) => { updateApp(id, {status: s}); if(selectedAppointment && selectedAppointment.id === id) setSelectedAppointment({...selectedAppointment, status: s}); };
   const getCategoryLabel = (k) => { const m = { 'inspection': t.catInspection, 'consulting': t.catConsulting, 'emergency': t.catEmergency }; return m[k] || k; };
+  const triggerStationNav = (name, city) => { safeOpen(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${city}`)}`); };
 
   const filterFn = a => a.customerName.toLowerCase().includes(filter.toLowerCase()) || a.city.toLowerCase().includes(filter.toLowerCase());
   const incoming = appointments.filter(a => (a.status === 'incoming' || !a.status) && filterFn(a));
@@ -348,8 +374,6 @@ export default function App() {
              <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-medium border border-slate-200">{getCategoryLabel(a.category)}</span>
            </Card>
 
-           <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
-
            {/* TASKS SECTION MOVED UP */}
            <Card className="p-0 overflow-hidden">
              <div className="p-4 bg-slate-50/50 border-b border-slate-200 flex justify-between"><h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckSquare size={18} className="text-blue-500"/> {t.tasksTitle}</h3></div>
@@ -364,10 +388,27 @@ export default function App() {
              </div>
            </Card>
 
+           {/* NAVIGATION BUTTON MOVED HERE */}
+           <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
+
            {/* LOGISTICS SECTION MOVED DOWN */}
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card>
-              <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100"><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card>
+              <Card className="p-4">
+                  <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3>
+                  <div className="space-y-2">
+                      {foodData.map((f, i) => (
+                          <div 
+                            key={i} 
+                            className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                            onClick={() => triggerStationNav(f.name, a.city)}
+                          >
+                              <span>{f.name}</span>
+                              <span className="text-slate-400">{f.dist}</span>
+                          </div>
+                      ))}
+                  </div>
+              </Card>
            </div>
 
            <Card className="p-4">
@@ -432,10 +473,15 @@ export default function App() {
               {/* DESKTOP VIEW: Edge to Edge Columns */}
               {!isMobile && (
                   <div className="flex flex-row h-full w-full divide-x divide-slate-200">
-                      {/* Removed inner padding to ensure edge-to-edge */}
-                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
-                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
-                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
+                      <div className="flex-1 h-full p-2">
+                        <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
+                      </div>
+                      <div className="flex-1 h-full p-2">
+                        <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
+                      </div>
+                      <div className="flex-1 h-full p-2">
+                        <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
+                      </div>
                   </div>
               )}
               {/* MOBILE VIEW: Stacked with Padding */}
