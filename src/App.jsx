@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo
+  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
@@ -14,14 +14,14 @@ try {
   } else {
     // HIER DEINE DATEN EINTRAGEN
     firebaseConfig = {
-  apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-  authDomain: "dc-inspect.firebaseapp.com",
-  projectId: "dc-inspect",
-  storageBucket: "dc-inspect.firebasestorage.app",
-  messagingSenderId: "639013498118",
-  appId: "1:639013498118:web:15146029fbc159cbd30287",
-  measurementId: "G-5TETMHQ1EW"
-  };
+      apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+      authDomain: "dc-inspect.firebaseapp.com",
+      projectId: "dc-inspect",
+      storageBucket: "dc-inspect.firebasestorage.app",
+      messagingSenderId: "639013498118",
+      appId: "1:639013498118:web:15146029fbc159cbd30287",
+      measurementId: "G-5TETMHQ1EW"
+    };
   }
 } catch (e) { console.error("Config Error", e); }
 
@@ -33,6 +33,44 @@ try {
 } catch (error) { console.error("Firebase Init Error:", error); }
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+// --- MOTIVATIONAL QUOTES ---
+const motivationalQuotes = [
+  "Win the day.",
+  "We are not here to take part, we are here to take over.",
+  "Success is not final, failure is not fatal.",
+  "Do it with passion or not at all.",
+  "Your only limit is your mind.",
+  "Mach jeden Tag zu deinem Meisterwerk.",
+  "Quality means doing it right when no one is looking.",
+  "Don't stop until you're proud.",
+  "Discipline is doing what needs to be done, even if you don't want to.",
+  "Focus on the solution, not the problem.",
+  "Dream big. Start small. Act now.",
+  "Hard work beats talent when talent doesn't work hard."
+];
+
+const getRandomQuote = () => {
+  return motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
+};
+
+// --- Components ---
+const DCLogo = ({ size = 48, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={`rounded-lg shadow-sm flex-shrink-0 ${className}`}>
+    <rect width="100" height="100" rx="20" fill="#2563EB"/>
+    <path d="M25 25H45C58.8071 25 70 36.1929 70 50V50C70 63.8071 58.8071 75 45 75H25V25Z" stroke="white" strokeWidth="8"/>
+    <path d="M25 25V75" stroke="white" strokeWidth="8"/>
+    <path d="M65 65L80 80" stroke="white" strokeWidth="8" strokeLinecap="round"/>
+    <circle cx="55" cy="50" r="15" stroke="white" strokeWidth="6" strokeOpacity="0.5"/>
+    <text x="50" y="62" fontSize="35" fontWeight="bold" fill="white" textAnchor="middle" fontFamily="sans-serif">DC</text>
+  </svg>
+);
+
+const AppLogo = ({ size = "w-14 h-14", showFallback = true }) => {
+  const [imgError, setImgError] = useState(false);
+  if (imgError) return showFallback ? <DCLogo size={56} /> : null;
+  return <img src="/logo.jpg" alt="DC Logo" className={`${size} rounded-xl object-cover shadow-sm bg-white`} onError={() => setImgError(true)} />;
+};
 
 // --- Translations ---
 const translations = {
@@ -89,12 +127,13 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
   const handleDrop = (e) => { e.preventDefault(); setIsDragOver(false); const id = e.dataTransfer.getData("appId"); if(id) onStatusChange(id, status); };
 
   return (
+    // WICHTIG: h-full und flex-1 sorgen für maximale Höhe
     <div 
         onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} 
-        className={`flex-1 flex flex-col rounded-2xl border transition-all duration-200 overflow-hidden h-full min-h-[150px]
+        className={`flex-1 flex flex-col rounded-2xl border transition-all duration-200 overflow-hidden h-full
         ${isDragOver?'bg-blue-50 border-blue-300 ring-2 ring-blue-100':'bg-slate-100/50 border-slate-200/60'}`}
     >
-      <div className={`p-3 font-bold text-xs uppercase tracking-wider border-b border-slate-200 flex justify-between items-center ${status==='incoming'?'text-blue-600 bg-blue-50/50':status==='pending'?'text-orange-600 bg-orange-50/50':'text-green-600 bg-green-50/50'}`}>
+      <div className={`p-3 font-bold text-xs uppercase tracking-wider border-b border-slate-200 flex justify-between items-center flex-shrink-0 ${status==='incoming'?'text-blue-600 bg-blue-50/50':status==='pending'?'text-orange-600 bg-orange-50/50':'text-green-600 bg-green-50/50'}`}>
         {title} <span className="bg-white px-2 py-0.5 rounded-full text-[10px] shadow-sm text-slate-600">{appointments.length}</span>
       </div>
       <div className="p-2 overflow-y-auto flex-1 space-y-2 custom-scrollbar">
@@ -125,7 +164,12 @@ export default function App() {
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({ customerName: '', city: '', address: '', date: '', time: '', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [] });
 
+  // --- SPLASH SCREEN STATE ---
+  const [showSplash, setShowSplash] = useState(true);
+  const [dailyQuote, setDailyQuote] = useState("");
+
   useEffect(() => {
+    setDailyQuote(getRandomQuote());
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -185,6 +229,24 @@ export default function App() {
     }
   }, [selectedAppointment, view, lang]);
 
+  // --- SPLASH SCREEN RENDER ---
+  if (showSplash) {
+    return (
+      <div 
+        onClick={() => setShowSplash(false)} 
+        className="fixed inset-0 z-50 bg-blue-600 flex flex-col items-center justify-center text-white cursor-pointer transition-opacity duration-500"
+      >
+        <div className="transform transition-transform duration-700 hover:scale-105 flex flex-col items-center">
+           <AppLogo size="w-40 h-40" showFallback={true} /> 
+           <h1 className="text-4xl font-black mt-6 mb-2 tracking-tighter">DC INSPECT</h1>
+           <div className="w-16 h-1 bg-white/30 rounded-full mb-8"></div>
+           <div className="max-w-xs text-center px-6"><Quote size={24} className="mb-2 opacity-50 mx-auto" /><p className="text-xl font-medium italic leading-relaxed opacity-90">"{dailyQuote}"</p></div>
+        </div>
+        <div className="absolute bottom-10 text-xs font-bold uppercase tracking-widest opacity-50 animate-pulse">Tap anywhere to start</div>
+      </div>
+    );
+  }
+
   if(loading) return <div className="h-screen flex items-center justify-center text-blue-600"><Loader className="animate-spin"/></div>;
 
   if(view === 'add') {
@@ -234,7 +296,6 @@ export default function App() {
         </div>
 
         <div className="px-4 -mt-10 relative z-10 w-full max-w-4xl mx-auto space-y-4">
-           {/* STATUS BUTTONS */}
            <Card className="p-3 grid grid-cols-2 gap-3">
               {a.status === 'incoming' && <Button variant="orange" onClick={() => handleUpdateStatus(a.id, 'pending')}>{t.moveToPending}</Button>}
               {a.status === 'pending' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'incoming')} icon={Undo}>{t.moveToIncoming}</Button>}
@@ -250,14 +311,8 @@ export default function App() {
            </Card>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="p-4">
-                  <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3>
-                  <Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button>
-              </Card>
-              <Card className="p-4">
-                  <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3>
-                  <div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100"><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div>
-              </Card>
+              <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card>
+              <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100"><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card>
            </div>
 
            <Card className="p-0 overflow-hidden">
@@ -316,7 +371,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col h-screen overflow-hidden text-slate-900">
       <div className="bg-white px-5 py-4 border-b border-slate-200 flex justify-between items-center shadow-sm z-20 flex-shrink-0">
          <div className="flex items-center gap-3">
-            <img src="/logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg object-cover shadow-sm" />
+            <AppLogo size="w-14 h-14" showFallback={true} />
             <div><h1 className="text-xl font-black text-blue-900 tracking-tight">{t.appTitle}</h1><p className="text-[10px] text-slate-500 font-medium">{t.subtitle}</p></div>
          </div>
          <div className="flex gap-2">
@@ -328,22 +383,30 @@ export default function App() {
 
       <div className="px-4 py-2 bg-white border-b border-slate-100 z-10 flex-shrink-0"><div className="relative"><SearchIcon className="absolute left-3 top-3 text-slate-400" size={16}/><input placeholder={t.searchPlaceholder} value={filter} onChange={e => setFilter(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-slate-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all text-slate-900" /></div></div>
 
-      <div className="flex-1 overflow-y-auto p-4 w-full">
+      {/* MAIN CONTENT: REMOVED PADDING ON WRAPPER */}
+      <div className="flex-1 overflow-hidden relative w-full bg-slate-50">
         {view === 'archive' ? (
-            <div className="max-w-3xl mx-auto space-y-3">{done.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">DONE</span></div>)}</div>
+            <div className="max-w-3xl mx-auto space-y-3 p-4 overflow-y-auto h-full">{done.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">DONE</span></div>)}</div>
         ) : (
             <>
-              {/* DESKTOP VIEW */}
+              {/* DESKTOP VIEW: FULL WIDTH, NO PADDING */}
               {!isMobile && (
-                  <div className="flex flex-row gap-4 h-full w-full">
-                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
-                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
-                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                  <div className="flex flex-row gap-0 h-full w-full divide-x divide-slate-200">
+                      {/* Added minimal padding INSIDE columns via gap or internal padding if needed, but requested 'edge to edge' */}
+                      <div className="flex-1 h-full p-2">
+                        <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                      </div>
+                      <div className="flex-1 h-full p-2">
+                        <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                      </div>
+                      <div className="flex-1 h-full p-2">
+                        <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                      </div>
                   </div>
               )}
-              {/* MOBILE VIEW (Stacked) */}
+              {/* MOBILE VIEW (Stacked) WITH PADDING */}
               {isMobile && (
-                  <div className="flex flex-col gap-6">
+                  <div className="flex flex-col gap-4 p-4 overflow-y-auto h-full">
                       <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
                       <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
                       <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
