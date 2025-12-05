@@ -34,7 +34,7 @@ try {
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- MOTIVATIONAL QUOTES ---
+// --- MOTIVATIONAL QUOTES (Expanded) ---
 const motivationalQuotes = [
   "Win the day.",
   "We are not here to take part, we are here to take over.",
@@ -47,7 +47,21 @@ const motivationalQuotes = [
   "Discipline is doing what needs to be done, even if you don't want to.",
   "Focus on the solution, not the problem.",
   "Dream big. Start small. Act now.",
-  "Hard work beats talent when talent doesn't work hard."
+  "Hard work beats talent when talent doesn't work hard.",
+  "Excellence is not an act, but a habit.",
+  "Be so good they can't ignore you.",
+  "Stay hungry. Stay foolish.",
+  "Do it when nobody ain't watching",
+  "Opportunities don't happen, you create them.",
+  "Believe you can and you're halfway there.",
+  "Your future is created by what you do today, not tomorrow.",
+  "Small progress is still progress.",
+  "Work hard in silence, let your success be your noise.",
+  "Es gibt keinen Ersatz für harte Arbeit.",
+  "Action is the foundational key to all success.",
+  "Don't watch the clock; do what it does. Keep going.",
+  "Success usually comes to those who are too busy to be looking for it.",
+  "The only place where success comes before work is in the dictionary."
 ];
 
 const getRandomQuote = () => {
@@ -473,8 +487,6 @@ export default function App() {
              <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-medium border border-slate-200">{getCategoryLabel(a.category)}</span>
            </Card>
 
-           <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
-
            {/* TASKS SECTION MOVED UP */}
            <Card className="p-0 overflow-hidden">
              <div className="p-4 bg-slate-50/50 border-b border-slate-200 flex justify-between"><h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckSquare size={18} className="text-blue-500"/> {t.tasksTitle}</h3></div>
@@ -488,6 +500,9 @@ export default function App() {
                <div className="p-3"><input className="w-full bg-slate-50 p-2 rounded border border-slate-200 text-sm" placeholder={t.taskPlaceholder} onKeyDown={(e)=>{ if(e.key==='Enter'){ const n=[...(a.todos||[]), {text:e.target.value, done:false}]; updateApp(a.id, {todos: n}); setSelectedAppointment({...a, todos:n}); e.target.value=''; }}}/></div>
              </div>
            </Card>
+
+           {/* NAVIGATION BUTTON MOVED HERE */}
+           <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
 
            {/* LOGISTICS SECTION MOVED DOWN */}
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -522,6 +537,7 @@ export default function App() {
                   />
                   <Button fullWidth onClick={() => handleReportUpdate(a.reportNotes || '')} icon={Wand2}>{t.generateBtn}</Button>
               </div>
+              
               {a.finalReport && (
                   <div className="mt-4 pt-4 border-t border-slate-100">
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.reportResultLabel}</label>
