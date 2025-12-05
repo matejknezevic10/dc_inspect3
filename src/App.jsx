@@ -21,7 +21,7 @@ try {
   messagingSenderId: "639013498118",
   appId: "1:639013498118:web:15146029fbc159cbd30287",
   measurementId: "G-5TETMHQ1EW"
-    };
+};
   }
 } catch (e) { console.error("Config Error", e); }
 
@@ -87,7 +87,6 @@ const translations = {
     navStart: "Pokreni Navigaciju", gasButton: "Traži benzinske (GPS)", logisticsTitle: "Logistika", foodTitle: "Hrana", gasTitle: "Gorivo", gasDesc: "Cijene u blizini", confirmDelete: "Obrisati?",
     catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
     reportNotesPlaceholder: "- Kvar na ventilu...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja",
-    mobileTabIncoming: "Novi", mobileTabPending: "U Tijeku", mobileTabDone: "Gotovo",
     tasksTitle: "Pripreme / To-do"
   },
   en: {
@@ -103,7 +102,6 @@ const translations = {
     navStart: "Start Navigation", gasButton: "Search Gas Stations (GPS)", logisticsTitle: "Logistics", foodTitle: "Food", gasTitle: "Fuel", gasDesc: "Prices nearby", confirmDelete: "Delete?",
     catInspection: "Inspection", catConsulting: "Consulting", catEmergency: "Emergency",
     reportNotesPlaceholder: "- Valve broken...", generateBtn: "Generate Report", reportResultLabel: "Report Preview",
-    mobileTabIncoming: "Incoming", mobileTabPending: "Pending", mobileTabDone: "Done",
     tasksTitle: "Preparation / To-do before taking over"
   }
 };
@@ -148,14 +146,17 @@ const Select = ({ label, options, ...props }) => (
   </div>
 );
 
+// Updated KanbanColumn to handle mobile stacking and full-width desktop
 const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange, isMobile }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const handleDragOver = (e) => { e.preventDefault(); setIsDragOver(true); };
   const handleDragLeave = (e) => { e.preventDefault(); setIsDragOver(false); };
   const handleDrop = (e) => { e.preventDefault(); setIsDragOver(false); const id = e.dataTransfer.getData("appId"); if(id) onStatusChange(id, status); };
 
+  // Desktop: No rounding, no border (handled by parent divider), full height
+  // Mobile: Rounded, Border, Fixed height or Auto
   const containerClasses = isMobile 
-    ? `flex-1 flex flex-col rounded-2xl border border-slate-200/60 transition-all duration-200 overflow-hidden h-[500px]`
+    ? `flex-1 flex flex-col rounded-2xl border border-slate-200/60 transition-all duration-200 overflow-hidden min-h-[400px]`
     : `flex-1 flex flex-col h-full transition-all duration-200 overflow-hidden`;
 
   const bgClass = isDragOver ? 'bg-blue-50' : (isMobile ? 'bg-slate-50/50' : 'bg-slate-50');
@@ -188,7 +189,7 @@ export default function App() {
   const [view, setView] = useState('dashboard');
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [filter, setFilter] = useState('');
-  const [lang, setLang] = useState('en'); // DEFAULT LANGUAGE CHANGED TO 'en'
+  const [lang, setLang] = useState('en'); // Default EN
   const t = translations[lang];
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [foodData, setFoodData] = useState([]);
@@ -339,8 +340,6 @@ export default function App() {
 
               {/* ARCHIVED STATUS ACTIONS */}
               {a.status === 'archived' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'done')} icon={Undo}>{t.restoreFromArchive}</Button>}
-
-              <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} icon={Navigation}>{t.navStart}</Button>
            </Card>
 
            <Card className="p-5 shadow-lg">
@@ -351,7 +350,7 @@ export default function App() {
 
            <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
 
-           {/* TASKS SECTION MOVED UP */}
+           {/* TASKS SECTION */}
            <Card className="p-0 overflow-hidden">
              <div className="p-4 bg-slate-50/50 border-b border-slate-200 flex justify-between"><h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckSquare size={18} className="text-blue-500"/> {t.tasksTitle}</h3></div>
              <div className="divide-y divide-slate-100">
@@ -365,7 +364,6 @@ export default function App() {
              </div>
            </Card>
 
-           {/* LOGISTICS SECTION MOVED DOWN */}
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card>
               <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100"><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card>
@@ -427,9 +425,7 @@ export default function App() {
 
       <div className="flex-1 overflow-hidden relative w-full bg-slate-50">
         {view === 'archive' ? (
-            <div className="max-w-3xl mx-auto space-y-3 p-4 overflow-y-auto h-full custom-scrollbar">
-                {archived.length === 0 ? <div className="text-center py-10 text-slate-300 italic">{t.emptyArchive}</div> : archived.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-slate-500 text-white px-2 py-1 rounded">ARCHIVED</span></div>)}
-            </div>
+            <div className="max-w-3xl mx-auto space-y-3 p-4 overflow-y-auto h-full custom-scrollbar">{done.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">DONE</span></div>)}</div>
         ) : (
             <>
               {/* DESKTOP VIEW: Edge to Edge Columns */}
