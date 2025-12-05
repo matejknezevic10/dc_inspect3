@@ -14,13 +14,13 @@ try {
   } else {
     // HIER DEINE DATEN EINTRAGEN
     firebaseConfig = {
-      apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-      authDomain: "dc-inspect.firebaseapp.com",
-      projectId: "dc-inspect",
-      storageBucket: "dc-inspect.firebasestorage.app",
-      messagingSenderId: "639013498118",
-      appId: "1:639013498118:web:15146029fbc159cbd30287",
-      measurementId: "G-5TETMHQ1EW"
+  apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+  authDomain: "dc-inspect.firebaseapp.com",
+  projectId: "dc-inspect",
+  storageBucket: "dc-inspect.firebasestorage.app",
+  messagingSenderId: "639013498118",
+  appId: "1:639013498118:web:15146029fbc159cbd30287",
+  measurementId: "G-5TETMHQ1EW"
     };
   }
 } catch (e) { console.error("Config Error", e); }
@@ -58,7 +58,6 @@ const translations = {
     save: "Spremi", delete: "Obriši", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Pokreni Navigaciju", gasButton: "Traži benzinske (GPS)", logisticsTitle: "Logistika", foodTitle: "Hrana", gasTitle: "Gorivo", gasDesc: "Cijene u blizini", confirmDelete: "Obrisati?",
     catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
-    mobileTabIncoming: "Novi", mobileTabPending: "U Tijeku", mobileTabDone: "Gotovo",
     reportNotesPlaceholder: "- Kvar na ventilu...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja"
   },
   en: {
@@ -72,7 +71,6 @@ const translations = {
     save: "Save", delete: "Delete", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Start Navigation", gasButton: "Search Gas Stations (GPS)", logisticsTitle: "Logistics", foodTitle: "Food", gasTitle: "Fuel", gasDesc: "Prices nearby", confirmDelete: "Delete?",
     catInspection: "Inspection", catConsulting: "Consulting", catEmergency: "Emergency",
-    mobileTabIncoming: "Incoming", mobileTabPending: "Pending", mobileTabDone: "Done",
     reportNotesPlaceholder: "- Valve broken...", generateBtn: "Generate Report", reportResultLabel: "Report Preview"
   }
 };
@@ -102,7 +100,7 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
   return (
     <div 
         onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} 
-        className={`flex-1 flex flex-col rounded-2xl border transition-all duration-200 overflow-hidden h-full min-h-[200px]
+        className={`flex-1 flex flex-col rounded-2xl border transition-all duration-200 overflow-hidden h-full min-h-[150px]
         ${isDragOver?'bg-blue-50 border-blue-300 ring-2 ring-blue-100':'bg-slate-100/50 border-slate-200/60'}`}
     >
       <div className={`p-3 font-bold text-xs uppercase tracking-wider border-b border-slate-200 flex justify-between items-center ${status==='incoming'?'text-blue-600 bg-blue-50/50':status==='pending'?'text-orange-600 bg-orange-50/50':'text-green-600 bg-green-50/50'}`}>
@@ -131,7 +129,6 @@ export default function App() {
   const [lang, setLang] = useState('hr');
   const t = translations[lang];
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [mobileTab, setMobileTab] = useState('incoming');
   const [foodData, setFoodData] = useState([]);
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({ customerName: '', city: '', address: '', date: '', time: '', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [] });
@@ -246,6 +243,7 @@ export default function App() {
         </div>
 
         <div className="px-4 -mt-10 relative z-10 w-full max-w-4xl mx-auto space-y-4">
+           {/* STATUS BUTTONS */}
            <Card className="p-3 grid grid-cols-2 gap-3">
               {a.status === 'incoming' && <Button variant="orange" onClick={() => handleUpdateStatus(a.id, 'pending')}>{t.moveToPending}</Button>}
               {a.status === 'pending' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'incoming')} icon={Undo}>{t.moveToIncoming}</Button>}
@@ -341,6 +339,7 @@ export default function App() {
             <div className="max-w-3xl mx-auto space-y-3">{done.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">DONE</span></div>)}</div>
         ) : (
             <>
+              {/* DESKTOP VIEW */}
               {!isMobile && (
                   <div className="flex flex-row gap-4 h-full w-full">
                       <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
@@ -348,18 +347,12 @@ export default function App() {
                       <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
                   </div>
               )}
+              {/* MOBILE VIEW (Stacked) */}
               {isMobile && (
-                  <div className="pb-20">
-                      <div className="flex p-1 bg-slate-200 rounded-xl mb-4 sticky top-0 z-10 shadow-sm">
-                          <button onClick={() => setMobileTab('incoming')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mobileTab === 'incoming' ? 'bg-white text-blue-600 shadow' : 'text-slate-500'}`}>{t.mobileTabIncoming} ({incoming.length})</button>
-                          <button onClick={() => setMobileTab('pending')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mobileTab === 'pending' ? 'bg-white text-orange-600 shadow' : 'text-slate-500'}`}>{t.mobileTabPending} ({pending.length})</button>
-                          <button onClick={() => setMobileTab('done')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mobileTab === 'done' ? 'bg-white text-green-600 shadow' : 'text-slate-500'}`}>{t.mobileTabDone} ({done.length})</button>
-                      </div>
-                      <div className="space-y-3">
-                          {mobileTab === 'incoming' && (incoming.length === 0 ? <div className="text-center py-10 text-slate-400 text-sm">{t.emptyInbox}</div> : incoming.map(a => <div key={a.id} onClick={() => { setSelectedAppointment(a); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm cursor-pointer"><div className="flex justify-between mb-1"><h4 className="font-bold text-slate-800">{a.customerName}</h4><span className="text-xs bg-slate-100 px-2 py-1 rounded">{new Date(a.date).toLocaleDateString()}</span></div><div className="text-xs text-slate-500">{a.city} • {a.category}</div></div>))}
-                          {mobileTab === 'pending' && (pending.length === 0 ? <div className="text-center py-10 text-slate-400 text-sm">{t.emptyPending}</div> : pending.map(a => <div key={a.id} onClick={() => { setSelectedAppointment(a); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm cursor-pointer"><div className="flex justify-between mb-1"><h4 className="font-bold text-slate-800">{a.customerName}</h4><span className="text-xs bg-slate-100 px-2 py-1 rounded">{new Date(a.date).toLocaleDateString()}</span></div><div className="text-xs text-slate-500">{a.city} • {a.category}</div></div>))}
-                          {mobileTab === 'done' && (done.length === 0 ? <div className="text-center py-10 text-slate-400 text-sm">{t.emptyArchive}</div> : done.map(a => <div key={a.id} onClick={() => { setSelectedAppointment(a); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm cursor-pointer"><div className="flex justify-between mb-1"><h4 className="font-bold text-slate-800">{a.customerName}</h4><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">DONE</span></div></div>))}
-                      </div>
+                  <div className="flex flex-col gap-6">
+                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
+                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} />
                   </div>
               )}
             </>
