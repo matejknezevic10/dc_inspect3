@@ -14,14 +14,14 @@ try {
   } else {
     // HIER DEINE DATEN EINTRAGEN
     firebaseConfig = {
-  apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-  authDomain: "dc-inspect.firebaseapp.com",
-  projectId: "dc-inspect",
-  storageBucket: "dc-inspect.firebasestorage.app",
-  messagingSenderId: "639013498118",
-  appId: "1:639013498118:web:15146029fbc159cbd30287",
-  measurementId: "G-5TETMHQ1EW"
-};
+      apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+      authDomain: "dc-inspect.firebaseapp.com",
+      projectId: "dc-inspect",
+      storageBucket: "dc-inspect.firebasestorage.app",
+      messagingSenderId: "639013498118",
+      appId: "1:639013498118:web:15146029fbc159cbd30287",
+      measurementId: "G-5TETMHQ1EW"
+     };
   }
 } catch (e) { console.error("Config Error", e); }
 
@@ -172,7 +172,7 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
       <div className="p-3 overflow-y-auto flex-1 space-y-3 custom-scrollbar">
         {appointments.length===0 ? <div className="text-center py-10 text-slate-300 italic text-xs">{isDragOver?'Drop here':'Empty'}</div> : appointments.map(app => (
             <div key={app.id} draggable onDragStart={(e)=>{e.dataTransfer.setData("appId",app.id);e.dataTransfer.effectAllowed="move";}} onClick={()=>onClickApp(app)} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98] group relative">
-              <div className="flex justify-between items-start mb-1"><h4 className="font-bold text-slate-800 text-sm">{app.customerName}</h4><span className="text-[10px] font-medium bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded">{new Date(app.date).toLocaleDateString()}</span></div>
+              <div className="flex justify-between items-start mb-1"><h4 className="font-bold text-slate-800 text-sm">{app.customerName}</h4><span className="text-[10px] font-medium bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded">{new Date(app.date).toLocaleDateString(lang === 'hr' ? 'hr-HR' : 'en-US')}</span></div>
               <div className="flex items-center text-xs text-slate-500 gap-1 mb-2"><MapPin size={10}/> {app.city} <span className="mx-1">•</span> <span>{app.category}</span></div>
               <div className="bg-slate-50 px-2 py-1.5 rounded text-[11px] text-slate-600 truncate border border-slate-100">"{app.request}"</div>
             </div>
@@ -350,7 +350,7 @@ export default function App() {
 
            <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
 
-           {/* TASKS SECTION */}
+           {/* TASKS SECTION MOVED UP */}
            <Card className="p-0 overflow-hidden">
              <div className="p-4 bg-slate-50/50 border-b border-slate-200 flex justify-between"><h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckSquare size={18} className="text-blue-500"/> {t.tasksTitle}</h3></div>
              <div className="divide-y divide-slate-100">
@@ -364,6 +364,7 @@ export default function App() {
              </div>
            </Card>
 
+           {/* LOGISTICS SECTION MOVED DOWN */}
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card>
               <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100"><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card>
@@ -431,15 +432,10 @@ export default function App() {
               {/* DESKTOP VIEW: Edge to Edge Columns */}
               {!isMobile && (
                   <div className="flex flex-row h-full w-full divide-x divide-slate-200">
-                      <div className="flex-1 h-full p-2">
-                        <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
-                      </div>
-                      <div className="flex-1 h-full p-2">
-                        <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
-                      </div>
-                      <div className="flex-1 h-full p-2">
-                        <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
-                      </div>
+                      {/* Removed inner padding to ensure edge-to-edge */}
+                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
+                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
+                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} />
                   </div>
               )}
               {/* MOBILE VIEW: Stacked with Padding */}
