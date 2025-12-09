@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus
+  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { 
@@ -81,10 +81,11 @@ const translations = {
   hr: {
     appTitle: "DC INSPECT", subtitle: "Mobilni Asistent",
     navDashboard: "Dashboard", navArchive: "Arhiv", navTeam: "Tim",
-    colIncoming: "NOVI", colPending: "U TIJEKU", colDone: "ZAVRŠENO",
-    loginTitle: "Dobrodošli", loginBtn: "Prijavi se", registerBtn: "Registracija",
-    emailLabel: "Email adresa", passLabel: "Lozinka",
-    logout: "Odjava",
+    colIncoming: "NOVI", colPending: "U TIJEKU", colDone: "ZAVRŠENO", colArchived: "ARHIVIRANO",
+    emptyInbox: "Nema novih zadataka.", emptyPending: "Ništa nije u tijeku.", emptyArchive: "Arhiva je prazna.",
+    moveToPending: "Prebaci u tijek", moveToDone: "Završi", restore: "Vrati u proces", moveToIncoming: "Vrati u nove",
+    moveToArchived: "Arhiviraj", restoreFromArchive: "Vrati u završeno",
+    labelCustomer: "Ime Klijenta", labelCity: "Grad", labelAddress: "Adresa", labelAssign: "Dodijeli",
     save: "Spremi", delete: "Obriši", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Pokreni Navigaciju", addToCalendar: "Dodaj u Kalendar",
     tasksTitle: "Pripreme / To-do",
@@ -92,15 +93,16 @@ const translations = {
     catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
     reportNotesPlaceholder: "Unesite natuknice...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja",
     defaultTask1: "Pripremi alat", defaultTask2: "Pregledaj dokumentaciju", defaultTask3: "Ključeve", defaultTask4: "Zaštitna oprema",
-    authError: "Greška pri prijavi."
+    authError: "Greška pri prijavi.", loginTitle: "Dobrodošli", loginBtn: "Prijavi se", registerBtn: "Registracija", emailLabel: "Email adresa", passLabel: "Lozinka", logout: "Odjava", teamMapTitle: "Lokacije Tima"
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant",
     navDashboard: "Dashboard", navArchive: "Archive", navTeam: "Team",
-    colIncoming: "INCOMING", colPending: "PENDING", colDone: "DONE",
-    loginTitle: "Welcome Back", loginBtn: "Sign In", registerBtn: "Create Account",
-    emailLabel: "Email Address", passLabel: "Password",
-    logout: "Sign Out",
+    colIncoming: "INCOMING", colPending: "PENDING", colDone: "DONE", colArchived: "ARCHIVED",
+    emptyInbox: "No new tasks.", emptyPending: "Nothing pending.", emptyArchive: "Archive is empty.",
+    moveToPending: "Start Working", moveToDone: "Complete", restore: "Restore", moveToIncoming: "Move to Incoming",
+    moveToArchived: "Archive", restoreFromArchive: "Restore to Done",
+    labelCustomer: "Customer", labelCity: "City", labelAddress: "Address", labelAssign: "Assign to",
     save: "Save", delete: "Delete", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Start Navigation", addToCalendar: "Add to Calendar",
     tasksTitle: "Preparation / To-do",
@@ -108,7 +110,7 @@ const translations = {
     catInspection: "Inspection", catConsulting: "Consulting", catEmergency: "Emergency",
     reportNotesPlaceholder: "Enter keywords...", generateBtn: "Generate Report", reportResultLabel: "Report Preview",
     defaultTask1: "Prepare tools", defaultTask2: "Review docs", defaultTask3: "Check keys", defaultTask4: "Safety gear",
-    authError: "Authentication failed."
+    authError: "Authentication failed.", loginTitle: "Welcome Back", loginBtn: "Sign In", registerBtn: "Create Account", emailLabel: "Email Address", passLabel: "Password", logout: "Sign Out", teamMapTitle: "Team Locations"
   }
 };
 
@@ -166,6 +168,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState('login'); // login | register
   const [authData, setAuthData] = useState({ email: '', password: '' });
   const [authError, setAuthError] = useState('');
+  const [authErrorCode, setAuthErrorCode] = useState(''); // NEW: Track specific error code
   
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -229,6 +232,7 @@ export default function App() {
   const handleAuth = async () => {
     setLoading(true);
     setAuthError('');
+    setAuthErrorCode('');
     try {
         if (authMode === 'login') {
             await signInWithEmailAndPassword(auth, authData.email, authData.password);
@@ -243,16 +247,36 @@ export default function App() {
     } catch (e) {
         console.error(e);
         let msg = t.authError;
+        setAuthErrorCode(e.code); // Store error code for logic
+        
         if (e.code === 'auth/operation-not-allowed') {
-            msg = "Login method (Email/Password) disabled in Firebase Console.";
+            msg = lang === 'en' ? "Enable Email/Pass in Firebase!" : "Aktivirajte Email/Pass u Firebaseu!";
         } else if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
-            msg = "Invalid email or password.";
+            msg = lang === 'en' ? "Invalid email or password." : "Nevažeći email ili lozinka.";
         } else if (e.code === 'auth/email-already-in-use') {
-            msg = "Email already in use.";
+            msg = lang === 'en' ? "Email already in use." : "Email se već koristi.";
+        } else if (e.code === 'auth/weak-password') {
+            msg = lang === 'en' ? "Password too weak." : "Lozinka je preslaba.";
         }
         setAuthError(msg);
         setLoading(false);
     }
+  };
+
+  const handleDemoAuth = async () => {
+      setLoading(true);
+      setAuthError('');
+      try {
+          await signInAnonymously(auth);
+      } catch (e) {
+          console.error("Demo Auth Error:", e);
+          let msg = "Demo mode failed.";
+          if (e.code === 'auth/operation-not-allowed') {
+             msg = "Enable 'Anonymous' auth in Firebase Console for Demo.";
+          }
+          setAuthError(msg);
+          setLoading(false);
+      }
   };
 
   const handleLogout = async () => {
@@ -316,9 +340,12 @@ export default function App() {
                       {authMode === 'login' ? t.loginBtn : t.registerBtn}
                   </Button>
                   
-                  <div className="pt-4 border-t border-slate-100">
-                      <button onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} className="text-sm text-blue-600 font-bold hover:underline">
+                  <div className="pt-4 border-t border-slate-100 space-y-3">
+                      <button onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} className="text-sm text-blue-600 font-bold hover:underline w-full">
                           {authMode === 'login' ? "No account? Create one" : "Have an account? Login"}
+                      </button>
+                      <button onClick={handleDemoAuth} className="text-xs text-slate-400 hover:text-slate-600 w-full flex items-center justify-center gap-1">
+                          <HelpCircle size={12}/> {t.demoBtn}
                       </button>
                   </div>
               </div>
@@ -413,6 +440,55 @@ export default function App() {
     );
   }
 
+  // VIEW: TEAM DASHBOARD (CHEF MODE)
+  if (view === 'team') {
+      return (
+          <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900">
+             <div className="bg-white px-5 py-4 border-b border-slate-200 flex justify-between items-center shadow-sm sticky top-0 z-20">
+                <div className="flex items-center gap-3"><button onClick={() => setView('dashboard')}><ArrowLeft/></button><h1 className="text-lg font-bold">{t.navTeam}</h1></div>
+             </div>
+             
+             <div className="p-4 max-w-4xl mx-auto space-y-6">
+                <Card className="p-0 overflow-hidden relative h-64 bg-blue-50 border-blue-100">
+                    <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(#2563EB 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><MapIcon size={64} className="text-blue-200" /></div>
+                    {appointments.filter(a => a.status === 'pending').map((p, i) => {
+                        const assignee = TEAM_MEMBERS.find(m => m.id === p.assignedTo) || TEAM_MEMBERS[0];
+                        return (
+                            <div key={p.id} className="absolute bg-white p-2 rounded-xl shadow-lg border border-slate-200 flex items-center gap-2 animate-bounce" style={{ top: `${20 + (i*15)}%`, left: `${20 + (i*20)}%` }}>
+                                <img src={assignee.avatar} className="w-6 h-6 rounded-full"/>
+                                <div className="text-xs font-bold text-slate-700 whitespace-nowrap">{p.city}</div>
+                            </div>
+                        )
+                    })}
+                </Card>
+                <div>
+                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-3 flex items-center gap-2"><Users size={16}/> {t.teamStatusTitle}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {TEAM_MEMBERS.map(member => {
+                            const activeTask = appointments.find(p => p.assignedTo === member.id && p.status === 'pending');
+                            return (
+                                <Card key={member.id} className="p-4 flex items-center gap-4">
+                                    <div className="relative">
+                                        <img src={member.avatar} className="w-12 h-12 rounded-full border-2 border-white shadow-sm"/>
+                                        <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${activeTask ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-slate-800">{member.name}</div>
+                                        <div className="text-xs text-slate-500 mt-0.5">
+                                            {activeTask ? ( <span className="text-green-600 font-medium flex items-center gap-1"><MapPin size={10}/> {activeTask.city}: {activeTask.category}</span> ) : ( "Available / Idle" )}
+                                        </div>
+                                    </div>
+                                </Card>
+                            )
+                        })}
+                    </div>
+                </div>
+             </div>
+          </div>
+      )
+  }
+
   // VIEW: DASHBOARD
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col h-screen overflow-hidden text-slate-900">
@@ -434,7 +510,7 @@ export default function App() {
 
       <div className="flex-1 overflow-hidden relative w-full bg-slate-50">
         {view === 'archive' ? (
-            <div className="max-w-3xl mx-auto space-y-3 p-4 overflow-y-auto h-full custom-scrollbar">{archived.length === 0 ? <div className="text-center py-10 text-slate-300 italic">{t.emptyArchive}</div> : archived.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-slate-500 text-white px-2 py-1 rounded">{t.colArchived}</span></div>)}</div>
+            <div className="max-w-3xl mx-auto space-y-3 p-4 overflow-y-auto h-full custom-scrollbar">{done.map(app => <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between cursor-pointer hover:border-blue-300"><span className="font-bold text-slate-700">{app.customerName}</span><span className="text-xs bg-slate-500 text-white px-2 py-1 rounded">{t.colArchived}</span></div>)}</div>
         ) : (
             <>
               {/* DESKTOP VIEW: Edge to Edge Columns */}
