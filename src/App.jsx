@@ -92,7 +92,11 @@ const translations = {
     catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
     reportNotesPlaceholder: "Unesite natuknice...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja",
     defaultTask1: "Pripremi alat", defaultTask2: "Pregledaj dokumentaciju", defaultTask3: "Ključeve", defaultTask4: "Zaštitna oprema",
-    authError: "Greška pri prijavi.", demoBtn: "Probleme? Pokreni Demo (Anonimno)"
+    authError: "Greška pri prijavi.", demoBtn: "Probleme? Pokreni Demo (Anonimno)",
+    // RESTORED LABELS
+    labelCustomer: "Ime Klijenta", labelDate: "Datum", labelTime: "Vrijeme", labelCity: "Grad", labelAddress: "Adresa", labelRequest: "Opis", labelCategory: "Kategorija", labelAssign: "Dodijeli",
+    gasTitle: "Gorivo", gasDesc: "Cijene u blizini", gasButton: "Traži benzinske (GPS)",
+    foodTitle: "Hrana", foodSubtitle: "Preporuka rute"
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant",
@@ -108,7 +112,11 @@ const translations = {
     catInspection: "Inspection", catConsulting: "Consulting", catEmergency: "Emergency",
     reportNotesPlaceholder: "Enter keywords...", generateBtn: "Generate Report", reportResultLabel: "Report Preview",
     defaultTask1: "Prepare tools", defaultTask2: "Review docs", defaultTask3: "Check keys", defaultTask4: "Safety gear",
-    authError: "Authentication failed.", demoBtn: "Trouble? Start Demo (Anonymous)"
+    authError: "Authentication failed.", demoBtn: "Trouble? Start Demo (Anonymous)",
+    // RESTORED LABELS
+    labelCustomer: "Customer", labelDate: "Date", labelTime: "Time", labelCity: "City", labelAddress: "Address", labelRequest: "Request", labelCategory: "Category", labelAssign: "Assign to",
+    gasTitle: "Fuel", gasDesc: "Prices nearby", gasButton: "Search Gas Stations (GPS)",
+    foodTitle: "Food", foodSubtitle: "Route recommendation"
   }
 };
 
@@ -126,9 +134,15 @@ const openGoogleCalendar = (app) => { const startDate = new Date(`${app.date}T${
 // UI Components
 const Card = ({children, className='', onClick}) => (<div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>{children}</div>);
 
-// FIX: 'fullWidth' is now destructured to prevent it being passed to the button DOM element
 const Button = ({children, onClick, variant='primary', className='', icon:Icon, fullWidth, ...p}) => {
-  const vs = { primary: "bg-blue-600 text-white hover:bg-blue-700", secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50", success: "bg-green-600 text-white hover:bg-green-700", danger: "bg-red-50 text-red-600 hover:bg-red-100", orange: "bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100", gray: "bg-slate-200 text-slate-700 hover:bg-slate-300" };
+  const vs = { 
+      primary: "bg-blue-600 text-white hover:bg-blue-700", 
+      secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50", 
+      success: "bg-green-600 text-white hover:bg-green-700", 
+      danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-transparent", 
+      orange: "bg-orange-500 text-white hover:bg-orange-600", // Stronger orange for text visibility
+      gray: "bg-slate-200 text-slate-700 hover:bg-slate-300" 
+  };
   return <button onClick={onClick} className={`flex items-center justify-center px-4 py-3 rounded-lg font-bold text-sm transition-all active:scale-95 ${vs[variant]} ${fullWidth ? 'w-full' : ''} ${className}`} {...p}>{Icon && <Icon size={18} className="mr-2"/>}{children}</button>;
 };
 
@@ -149,13 +163,19 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
         {title} <span className="bg-white px-2 py-0.5 rounded-full text-[10px] shadow-sm text-slate-600">{appointments.length}</span>
       </div>
       <div className="p-3 overflow-y-auto flex-1 space-y-3 custom-scrollbar">
-        {appointments.length===0 ? <div className="text-center py-10 text-slate-300 italic text-xs">{isDragOver?'Drop here':'Empty'}</div> : appointments.map(app => (
+        {appointments.length===0 ? <div className="text-center py-10 text-slate-300 italic text-xs">{isDragOver?'Drop here':'Empty'}</div> : appointments.map(app => {
+            const assignee = TEAM_MEMBERS.find(m => m.id === app.assignedTo) || TEAM_MEMBERS[0];
+            return (
             <div key={app.id} draggable onDragStart={(e)=>{e.dataTransfer.setData("appId",app.id);e.dataTransfer.effectAllowed="move";}} onClick={()=>onClickApp(app)} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98] group relative">
-              <div className="flex justify-between items-start mb-1"><h4 className="font-bold text-slate-800 text-sm">{app.customerName}</h4><span className="text-[10px] font-medium bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded">{new Date(app.date).toLocaleDateString(lang === 'hr' ? 'hr-HR' : 'en-US')}</span></div>
+               <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-slate-800 text-sm">{app.customerName}</h4>
+                  <img src={assignee.avatar} className="w-6 h-6 rounded-full border border-slate-200" alt={assignee.name} title={assignee.name} />
+              </div>
+              <span className="text-[10px] font-medium bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded mb-2 inline-block">{new Date(app.date).toLocaleDateString(lang === 'hr' ? 'hr-HR' : 'en-US')}</span>
               <div className="flex items-center text-xs text-slate-500 gap-1 mb-2"><MapPin size={10}/> {app.city} <span className="mx-1">•</span> <span>{app.category}</span></div>
               <div className="bg-slate-50 px-2 py-1.5 rounded text-[11px] text-slate-600 truncate border border-slate-100">"{app.request}"</div>
             </div>
-        ))}
+        )})}
       </div>
     </div>
   );
@@ -409,9 +429,28 @@ export default function App() {
         </div>
 
         <div className="px-4 -mt-10 relative z-10 w-full max-w-4xl mx-auto space-y-4">
-           {role === 'admin' && (
-               <div className="flex items-center justify-between bg-white/90 backdrop-blur p-2 rounded-lg shadow-sm border border-white/50 text-xs font-medium text-slate-600"><span>{t.assignTo}</span><div className="flex items-center gap-2"><img src={assignee.avatar} className="w-5 h-5 rounded-full"/><span>{assignee.name}</span></div></div>
-           )}
+           
+           {/* EDITABLE ASSIGNEE IN DETAIL VIEW */}
+           <div className="bg-white/90 backdrop-blur p-2 rounded-lg shadow-sm border border-white/50 text-xs font-medium text-slate-600">
+                <div className="flex items-center justify-between mb-2">
+                    <span>{t.assignTo}</span>
+                    <div className="flex items-center gap-2">
+                        <img src={assignee.avatar} className="w-5 h-5 rounded-full"/>
+                        <span>{assignee.name}</span>
+                    </div>
+                </div>
+                {/* Enable changing assignee if Admin */}
+                {role === 'admin' && (
+                    <div className="flex gap-2 overflow-x-auto pb-1 pt-1 border-t border-slate-200">
+                        {TEAM_MEMBERS.map(m => (
+                            <button key={m.id} onClick={() => { updateApp(a.id, { assignedTo: m.id }); setSelectedAppointment({...a, assignedTo: m.id}); }} className={`flex-shrink-0 w-8 h-8 rounded-full border-2 ${a.assignedTo === m.id ? 'border-blue-500' : 'border-transparent opacity-50'}`}>
+                                <img src={m.avatar} className="w-full h-full rounded-full" title={m.name} />
+                            </button>
+                        ))}
+                    </div>
+                )}
+           </div>
+
            <Card className="p-3 grid grid-cols-2 gap-3">
               {a.status === 'incoming' && <Button variant="orange" onClick={() => handleUpdateStatus(a.id, 'pending')}>{t.moveToPending}</Button>}
               {a.status === 'pending' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'incoming')} icon={Undo}>{t.moveToIncoming}</Button>}
@@ -419,8 +458,8 @@ export default function App() {
               {a.status === 'done' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'pending')} icon={Undo}>{t.restore}</Button>}
               {a.status === 'done' && <Button variant="gray" onClick={() => handleUpdateStatus(a.id, 'archived')} icon={FolderArchive}>{t.moveToArchived}</Button>}
               {a.status === 'archived' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'done')} icon={Undo}>{t.restoreFromArchive}</Button>}
-              <Button variant="secondary" onClick={() => openGoogleCalendar(a)} icon={CalendarPlus}>{t.addToCalendar}</Button>
            </Card>
+
            <Card className="p-5 shadow-lg">
              <div className="flex gap-3 mb-4 border-b border-slate-100 pb-4"><div className="bg-blue-50 p-2.5 rounded-lg text-blue-600"><Calendar size={20} /></div><div><div className="text-xs text-slate-400 uppercase font-semibold">{t.labelDate}</div><div className="font-semibold text-slate-800">{new Date(a.date).toLocaleDateString()} - {a.time}</div></div></div>
              <p className="text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">{a.request}</p>
@@ -431,7 +470,7 @@ export default function App() {
            
            <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
            
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => triggerStationNav(f.name, a.city)}><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card></div>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><p className="text-xs text-slate-500 mb-3">{t.gasDesc}</p><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => triggerStationNav(f.name, a.city)}><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card></div>
            
            <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><FileText size={16}/> {t.reportTitle}</h3><div className="flex gap-2 overflow-x-auto pb-4 mb-2"><label className="flex-shrink-0 w-16 h-16 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-50"><Camera size={20}/><input type="file" className="hidden" accept="image/*" onChange={async (e) => { if(e.target.files[0]) { const b64 = await compressImage(e.target.files[0]); const n=[...(a.reportImages||[]), b64]; updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }}}/></label>{(a.reportImages||[]).map((img, i) => (<div key={i} className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200"><img src={img} className="w-full h-full object-cover"/><button onClick={() => { const n = a.reportImages.filter((_, idx) => idx !== i); updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5"><X size={10}/></button></div>))}</div><div className="space-y-2"><textarea className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm min-h-[100px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={t.reportNotesPlaceholder} value={a.reportNotes || ''} onChange={(e) => { setSelectedAppointment({...a, reportNotes: e.target.value}); }} /><Button fullWidth onClick={() => handleReportUpdate(a.reportNotes || '')} icon={Wand2}>{t.generateBtn}</Button></div>{a.finalReport && (<div className="mt-4 pt-4 border-t border-slate-100"><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.reportResultLabel}</label><div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono whitespace-pre-wrap mb-4 max-h-40 overflow-y-auto">{a.finalReport}</div><div className="flex gap-2"><Button size="small" variant="secondary" icon={Printer} onClick={() => printAsPdf(a.finalReport, a.reportImages)}>{t.downloadPdf}</Button><Button size="small" variant="secondary" icon={Download} onClick={() => downloadAsWord(a.finalReport, a.customerName, a.reportImages)}>{t.downloadDoc}</Button></div></div>)}</Card>
            <div className="pt-8 pb-4"><Button fullWidth variant="danger" icon={Trash2} onClick={() => deleteApp(a.id)}>{t.delete}</Button></div>
@@ -537,7 +576,12 @@ export default function App() {
         )}
       </div>
 
-      <div className="fixed bottom-6 right-6 z-30"><button onClick={() => { setFormData({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [], assignedTo: 'me' }); setView('add'); }} className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl shadow-blue-200 flex items-center justify-center transition-transform active:scale-90"><Plus size={28} /></button></div>
+      <div className="fixed bottom-6 right-6 z-30">
+          {/* Create Button only for Admin */}
+          {role === 'admin' && (
+              <button onClick={() => { setFormData({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [], assignedTo: 'me' }); setView('add'); }} className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl shadow-blue-200 flex items-center justify-center transition-transform active:scale-90"><Plus size={28} /></button>
+          )}
+      </div>
       <style>{`.custom-scrollbar::-webkit-scrollbar{height:4px;width:4px}.custom-scrollbar::-webkit-scrollbar-track{background:transparent}.custom-scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}`}</style>
     </div>
   );
