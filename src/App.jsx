@@ -8,7 +8,7 @@ import {
   Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, 
   UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, 
   Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database, Info,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, FilePlus, UserX
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { 
@@ -31,19 +31,22 @@ import {
   serverTimestamp, 
   setDoc, 
   getDoc,
-  writeBatch
+  writeBatch,
+  query,
+  where,
+  getDocs
 } from "firebase/firestore";
 
 // --- Firebase Configuration ---
-const firebaseConfig = {
-      apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-      authDomain: "dc-inspect.firebaseapp.com",
-      projectId: "dc-inspect",
-      storageBucket: "dc-inspect.firebasestorage.app",
-      messagingSenderId: "639013498118",
-      appId: "1:639013498118:web:15146029fbc159cbd30287",
-      measurementId: "G-5TETMHQ1EW"
-};
+  const firebaseConfig = {
+        apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+        authDomain: "dc-inspect.firebaseapp.com",
+        projectId: "dc-inspect",
+        storageBucket: "dc-inspect.firebasestorage.app",
+        messagingSenderId: "639013498118",
+        appId: "1:639013498118:web:15146029fbc159cbd30287",
+        measurementId: "G-5TETMHQ1EW"
+  };
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 let app, auth, db;
@@ -60,18 +63,19 @@ try {
 }
 
 // --- INITIAL DATA (Used for seeding DB only) ---
+// Note: 'email' is the key link for the new auth system
 const INITIAL_TEAM_MEMBERS = [
-  { id: 'me', name: 'Ich (Admin)', role: 'Geschäftsführer', email: 'boss@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
-  { id: 'anna', name: 'Anna Müller', role: 'Senior Inspektor', email: 'anna@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna' },
-  { id: 'max', name: 'Max Mustermann', role: 'Junior Inspektor', email: 'max@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
-  { id: 'tom', name: 'Tom B.', role: 'Techniker', email: 'tom@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tom' },
+  { id: 'david', name: 'David', role: 'admin', email: 'david@dcinspect.eu', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David' },
+  { id: 'matej', name: 'Matej', role: 'admin', email: 'matej_knezevic@yahoo.de', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Matej' },
+  { id: 'anna', name: 'Anna Müller', role: 'staff', email: 'anna@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna' },
+  { id: 'max', name: 'Max Mustermann', role: 'staff', email: 'max@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
 ];
 
-const MOCK_TEMPLATES = [
-    { id: 1, name: "Standard Hausinspektion", created: "2024-01-10", author: "Ich (Admin)" },
-    { id: 2, name: "Wasserschaden Analyse", created: "2024-02-15", author: "Anna Müller" },
-    { id: 3, name: "Dach & Fassade", created: "2024-03-01", author: "Ich (Admin)" },
-    { id: 4, name: "Elektro-Check (VDE)", created: "2024-03-20", author: "Tom B." }
+const INITIAL_TEMPLATES = [
+    { id: 't1', name: "Standard Hausinspektion", content: "Die Immobilie wurde in einem allgemein guten Zustand vorgefunden. Folgende Mängel wurden festgestellt:\n- ...\n- ...\nEmpfohlene Maßnahmen:\n- ...", created: "2024-01-10", author: "Ich (Admin)" },
+    { id: 't2', name: "Wasserschaden Analyse", content: "Untersuchung auf Feuchtigkeitsschäden.\nMesswerte:\n- Wandfeuchte: ...%\n- Bodenfeuchte: ...%\nUrsache vermutlich: ...", created: "2024-02-15", author: "Anna Müller" },
+    { id: 't3', name: "Dach & Fassade", content: "Sichtprüfung der Dacheindeckung und Fassade.\nZustand Dachrinne: OK/Mangelhaft\nZiegel: Vollständig\nRisse in Fassade: Keine sichtbar.", created: "2024-03-01", author: "Ich (Admin)" },
+    { id: 't4', name: "Elektro-Check (VDE)", content: "Prüfung der elektrischen Anlagen nach VDE.\nSicherungskasten: ...\nFI-Schalter Test: Erfolgreich\nOffene Leitungen: Keine.", created: "2024-03-20", author: "Tom B." }
 ];
 
 const getRandomQuote = () => {
@@ -140,7 +144,10 @@ const translations = {
     teamInit: "Tim je inicijaliziran",
     addEmployee: "Dodaj Zaposlenika", newEmployee: "Novi Zaposlenik", nameLabel: "Ime", roleLabel: "Uloga", cancel: "Odustani",
     autoSyncLabel: "Otvori Google Kalendar",
-    months: ["Siječanj", "Veljača", "Ožujak", "Travanj", "Svibanj", "Lipanj", "Srpanj", "Kolovoz", "Rujan", "Listopad", "Studeni", "Prosinac"]
+    months: ["Siječanj", "Veljača", "Ožujak", "Travanj", "Svibanj", "Lipanj", "Srpanj", "Kolovoz", "Rujan", "Listopad", "Studeni", "Prosinac"],
+    addTemplate: "Ubaci predložak", selectTemplate: "Odaberi predložak", createTemplate: "Novi predložak", import: "Uvoz", templateName: "Naziv predloška", templateContent: "Sadržaj",
+    guestMessage: "Vaš račun čeka odobrenje ili niste dodani u tim. Kontaktirajte administratora.",
+    guestTitle: "Pristup Ograničen"
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant",
@@ -169,7 +176,10 @@ const translations = {
     teamInit: "Team database initialized",
     addEmployee: "Add Employee", newEmployee: "New Employee", nameLabel: "Name", roleLabel: "Role", cancel: "Cancel",
     autoSyncLabel: "Open Google Calendar",
-    months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    addTemplate: "Insert Template", selectTemplate: "Select Template", createTemplate: "Create Template", import: "Import", templateName: "Template Name", templateContent: "Content",
+    guestMessage: "Your account is pending approval or you have not been added to the team. Please contact your administrator.",
+    guestTitle: "Access Restricted"
   }
 };
 
@@ -247,13 +257,14 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null); 
+  const [role, setRole] = useState(null); // 'admin' | 'staff' | 'guest'
   const [authMode, setAuthMode] = useState('login'); 
   const [authData, setAuthData] = useState({ email: '', password: '' });
   const [authError, setAuthError] = useState('');
   
   const [appointments, setAppointments] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]); // NEW: State for real Team Data
+  const [teamMembers, setTeamMembers] = useState([]); 
+  const [templates, setTemplates] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [view, setView] = useState('login'); 
@@ -273,59 +284,64 @@ export default function App() {
   // New states for adding/deleting employee
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
   const [newEmployeeData, setNewEmployeeData] = useState({ name: '', role: '', email: '' });
-  const [deleteEmployeeId, setDeleteEmployeeId] = useState(null); // Fix for delete confirmation
+  const [deleteEmployeeId, setDeleteEmployeeId] = useState(null); 
   
+  // New States for Template Modal
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [templateModalMode, setTemplateModalMode] = useState('select'); 
+  const [newTemplateData, setNewTemplateData] = useState({ name: '', content: '' });
+  const fileInputRef = useRef(null);
+
   // Admin Calendar State
   const [calendarViewDate, setCalendarViewDate] = useState(new Date());
 
   useEffect(() => { setDailyQuote(getRandomQuote()); const handleResize = () => setIsMobile(window.innerWidth <768); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, []);
 
-  // FIX: Scroll to top when view changes (Fixes issue where detail view starts scrolled down)
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [view, selectedAppointment]);
+  useEffect(() => { window.scrollTo(0, 0); }, [view, selectedAppointment]);
 
-  // Show notification helper
   const showNotification = (msg, type='success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // -------------------------------------------------------------
-  // STEP 1 IMPLEMENTATION: Fetch Team from Firestore
-  // -------------------------------------------------------------
+  // --- DATA FETCHING (Public) ---
   useEffect(() => {
-      // FIX: Wait for user authentication before fetching public data
-      // This prevents "Missing or insufficient permissions" errors on app load
       if (!db || !user) return;
       
-      // Using a PUBLIC collection so all authenticated users can see the team list
-      // Path: /artifacts/{appId}/public/data/team_members
       const teamColRef = collection(db, 'artifacts', appId, 'public', 'data', 'team_members');
-
-      const unsubscribe = onSnapshot(teamColRef, async (snap) => {
+      const unsubscribeTeam = onSnapshot(teamColRef, async (snap) => {
           if (snap.empty) {
-              // INITIALIZATION: If DB is empty, seed it with mock data
-              // This ensures the app is runnable immediately without manual DB entry
-              console.log("Team DB empty, initializing...");
               const batch = writeBatch(db);
               INITIAL_TEAM_MEMBERS.forEach(member => {
-                  const docRef = doc(teamColRef, member.id); // Use member.id as doc ID
+                  const docRef = doc(teamColRef, member.id);
                   batch.set(docRef, member);
               });
               await batch.commit();
-              showNotification(t.teamInit);
           } else {
               const members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
               setTeamMembers(members);
           }
-      }, (err) => {
-          console.error("Team Fetch Error:", err);
-      });
-      return () => unsubscribe();
-  }, [user]); // FIX: Added 'user' dependency to ensure auth is ready
+      }, (err) => console.error("Team Fetch Error:", err));
 
-  // Updated Init & Auth Effect
+      const tplColRef = collection(db, 'artifacts', appId, 'public', 'data', 'templates');
+      const unsubscribeTpl = onSnapshot(tplColRef, async (snap) => {
+          if (snap.empty) {
+              const batch = writeBatch(db);
+              INITIAL_TEMPLATES.forEach(tpl => {
+                  const docRef = doc(tplColRef, tpl.id);
+                  batch.set(docRef, tpl);
+              });
+              await batch.commit();
+          } else {
+              const tpls = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+              setTemplates(tpls);
+          }
+      }, (err) => console.error("Templates Fetch Error:", err));
+
+      return () => { unsubscribeTeam(); unsubscribeTpl(); };
+  }, [user]);
+
+  // --- AUTH FLOW ---
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -333,7 +349,7 @@ export default function App() {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
            await signInWithCustomToken(auth, __initial_auth_token);
         } else {
-           await signInAnonymously(auth);
+           // Do nothing, wait for user manual login
         }
       } catch (err) { console.warn("Auth flow check:", err); }
     };
@@ -341,15 +357,35 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
+        setUser(u);
         try {
+            // Force Super Admin Check on every login reload
+            const superAdmins = ['matej_knezevic@yahoo.de', 'david@dcinspect.eu'];
+            if (superAdmins.includes(u.email?.toLowerCase())) {
+                setRole('admin');
+                setView('dashboard');
+                return;
+            }
+
+            // Check user profile for role
             const userProfileRef = doc(db, 'artifacts', appId, 'users', u.uid, 'account', 'profile');
             const snap = await getDoc(userProfileRef);
-            if (snap.exists()) { setRole(snap.data().role); } else { setRole('admin'); }
+            
+            if (snap.exists()) {
+                const userData = snap.data();
+                setRole(userData.role);
+                // If guest, show limited view
+                if (userData.role === 'guest') setView('guest');
+                else setView('dashboard');
+            } else {
+                setRole('guest');
+                setView('guest');
+            }
         } catch (e) {
-            setRole('admin'); 
+            console.error("Auth Profile Error", e);
+            setRole('guest'); 
+            setView('guest');
         }
-        setUser(u);
-        setView('dashboard');
       } else {
         setUser(null);
         setRole(null);
@@ -360,9 +396,11 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // --- SHARED APPOINTMENTS (Public) ---
   useEffect(() => {
     if(!db || !user) return;
-    const q = collection(db, 'artifacts', appId, 'users', user.uid, 'appointments');
+    // NOTE: Appointments are now PUBLIC so all team members can see them
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'appointments');
     const unsubscribe = onSnapshot(q, (snap) => {
       const apps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       apps.sort((a,b) => new Date(a.date) - new Date(b.date));
@@ -380,21 +418,49 @@ export default function App() {
     try {
         if (authMode === 'login') {
             await signInWithEmailAndPassword(auth, authData.email, authData.password);
+            // onAuthStateChanged will handle redirection based on role
         } else {
+            // REGISTRATION LOGIC: "Claim Role"
             const userCredential = await createUserWithEmailAndPassword(auth, authData.email, authData.password);
-            await setDoc(doc(db, 'artifacts', appId, 'users', userCredential.user.uid, 'account', 'profile'), {
+            const uid = userCredential.user.uid;
+            
+            // Check if this email exists in team_members
+            const teamRef = collection(db, 'artifacts', appId, 'public', 'data', 'team_members');
+            const q = query(teamRef, where("email", "==", authData.email));
+            const querySnapshot = await getDocs(q);
+            
+            let assignedRole = 'guest';
+            
+            // SUPER ADMIN OVERRIDE CHECK
+            const superAdmins = ['matej_knezevic@yahoo.de', 'david@dcinspect.eu'];
+            if (superAdmins.includes(authData.email.toLowerCase())) {
+                assignedRole = 'admin';
+            } else {
+                // Normal checks
+                const allMembersSnap = await getDocs(teamRef);
+                if (allMembersSnap.empty) {
+                    assignedRole = 'admin';
+                    await setDoc(doc(teamRef, 'me'), { id: 'me', name: 'Admin', role: 'admin', email: authData.email, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=Admin` });
+                } else if (!querySnapshot.empty) {
+                    assignedRole = querySnapshot.docs[0].data().role || 'staff';
+                }
+            }
+
+            // Create User Profile
+            await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'account', 'profile'), {
                 email: authData.email,
-                role: 'admin',
+                role: assignedRole,
                 joined: serverTimestamp()
             });
-            setRole('admin');
+            
+            setRole(assignedRole);
+            if(assignedRole === 'guest') setView('guest');
+            else setView('dashboard');
         }
     } catch (e) {
         console.error(e);
         let msg = t.authError;
-        if (e.code === 'auth/operation-not-allowed') msg = lang === 'en' ? "Enable Email/Pass in Firebase!" : "Aktivirajte Email/Pass u Firebaseu!";
-        else if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') msg = lang === 'en' ? "Invalid email or password." : "Nevažeći email ili lozinka.";
-        else if (e.code === 'auth/email-already-in-use') msg = lang === 'en' ? "Email already in use." : "Email se već koristi.";
+        if (e.code === 'auth/email-already-in-use') msg = lang === 'en' ? "Email already in use." : "Email se već koristi.";
         else if (e.code === 'auth/weak-password') msg = lang === 'en' ? "Password too weak." : "Lozinka je preslaba.";
         setAuthError(msg);
         setLoading(false);
@@ -405,13 +471,18 @@ export default function App() {
       setLoading(true);
       setAuthError('');
       try {
-          await signInAnonymously(auth);
-          setRole('admin'); 
+          const cred = await signInAnonymously(auth);
+          // Set as guest for demo
+          await setDoc(doc(db, 'artifacts', appId, 'users', cred.user.uid, 'account', 'profile'), {
+              email: 'demo@guest.com',
+              role: 'guest',
+              joined: serverTimestamp()
+          });
+          setRole('guest');
+          setView('guest');
       } catch (e) {
           console.error("Demo Auth Error:", e);
-          let msg = "Demo mode failed.";
-          if (e.code === 'auth/operation-not-allowed') msg = "Enable 'Anonymous' auth in Firebase Console for Demo.";
-          setAuthError(msg);
+          setAuthError("Demo failed");
           setLoading(false);
       }
   };
@@ -421,7 +492,8 @@ export default function App() {
   const saveApp = async (data) => {
     if(!user) return;
     const { autoSync, ...dataToSave } = data;
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'appointments'), { 
+    // Save to PUBLIC appointments
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'appointments'), { 
         ...dataToSave, status: 'incoming', createdAt: serverTimestamp(), reportImages:[],
         todos: [ { text: t.defaultTask1, done: false }, { text: t.defaultTask2, done: false }, { text: t.defaultTask3, done: false }, { text: t.defaultTask4, done: false } ]
     });
@@ -434,12 +506,12 @@ export default function App() {
     showNotification("Saved successfully");
   };
 
-  const updateApp = async (id, data) => { if(!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id), data); };
+  const updateApp = async (id, data) => { if(!user) return; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'appointments', id), data); };
   
   const deleteApp = async (id) => { 
       if(!user) return; 
       if (deleteConfirmId === id) {
-          await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id)); 
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'appointments', id)); 
           setView('dashboard');
           setDeleteConfirmId(null);
           showNotification("Deleted");
@@ -449,34 +521,30 @@ export default function App() {
       }
   };
 
-  // --- NEW: Add Employee Function ---
+  // --- EMPLOYEE FUNCTIONS ---
   const addEmployee = async () => {
       if(!newEmployeeData.name || !newEmployeeData.email) return;
-      // Generate ID from email prefix + random suffix to ensure uniqueness but keep it readable
-      const safeId = newEmployeeData.email.split('@')[0].replace(/[^a-z0-9]/gi, '') + '_' + Math.floor(Math.random() * 1000);
-      
+      // Use email as part of ID to make it searchable/unique easier
+      const safeId = newEmployeeData.email.replace(/[^a-z0-9]/gi, '_');
       try {
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'team_members', safeId), {
             id: safeId,
             name: newEmployeeData.name,
-            role: newEmployeeData.role || 'Staff',
+            role: newEmployeeData.role || 'staff',
             email: newEmployeeData.email,
-            // Generate avatar based on name
             avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(newEmployeeData.name)}`
           });
           setIsAddingEmployee(false);
           setNewEmployeeData({ name: '', role: '', email: '' });
-          showNotification(lang === 'hr' ? "Zaposlenik dodan!" : "Employee added!");
+          showNotification(lang === 'hr' ? "Zaposlenik dodan! Neka se registrira." : "Employee added! Tell them to register.");
       } catch (err) {
           console.error("Error adding employee:", err);
           showNotification("Error adding employee", "error");
       }
   };
 
-  // --- FIXED: Delete Employee Function (No window.confirm) ---
   const handleDeleteEmployee = async (empId) => {
       if (deleteEmployeeId === empId) {
-          // Confirmed
           try {
               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'team_members', empId));
               showNotification(lang === 'hr' ? "Zaposlenik obrisan" : "Employee removed");
@@ -486,9 +554,85 @@ export default function App() {
               showNotification("Error deleting", "error");
           }
       } else {
-          // First click - ask for confirmation
           setDeleteEmployeeId(empId);
           setTimeout(() => setDeleteEmployeeId(null), 3000);
+      }
+  };
+
+  // --- TEMPLATE FUNCTIONS ---
+  const createTemplate = async () => {
+      if(!newTemplateData.name || !newTemplateData.content) return;
+      try {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), {
+              name: newTemplateData.name,
+              content: newTemplateData.content,
+              created: new Date().toISOString().split('T')[0],
+              author: role === 'admin' ? 'Admin' : 'Staff'
+          });
+          setIsTemplateModalOpen(false);
+          setNewTemplateData({ name: '', content: '' });
+          showNotification("Template Created");
+      } catch(err) {
+          console.error(err);
+          showNotification("Error creating template", "error");
+      }
+  };
+
+  const handleImportTemplate = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const fileName = file.name.toLowerCase();
+      const reader = new FileReader();
+      
+      reader.onload = async (evt) => {
+          try {
+              const text = evt.target.result;
+              let contentToSave = null;
+
+              if (fileName.endsWith('.json')) {
+                  const json = JSON.parse(text);
+                  if (json.name && json.content) contentToSave = json;
+              } else if (fileName.endsWith('.csv')) {
+                  const lines = text.split('\n').filter(l => l.trim().length > 0);
+                  if (lines.length > 0) {
+                      const separator = lines[0].includes(';') ? ';' : ',';
+                      const parts = lines[lines.length > 1 ? 1 : 0].split(separator);
+                      if(parts.length >= 2) {
+                          contentToSave = {
+                              name: parts[0].trim().replace(/^"|"$/g, ''),
+                              content: parts.slice(1).join(separator).trim().replace(/^"|"$/g, '')
+                          };
+                      }
+                  }
+              }
+
+              if (contentToSave) {
+                  await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), {
+                      name: contentToSave.name,
+                      content: contentToSave.content,
+                      created: new Date().toISOString().split('T')[0],
+                      author: 'Imported'
+                  });
+                  showNotification("Template Imported");
+              } else {
+                  showNotification("Invalid file format", "error");
+              }
+          } catch (err) {
+              console.error(err);
+              showNotification("Import Error", "error");
+          }
+      };
+      reader.readAsText(file);
+      e.target.value = null; 
+  };
+
+  const applyTemplate = (content) => {
+      if (selectedAppointment) {
+          const newNotes = (selectedAppointment.reportNotes ? selectedAppointment.reportNotes + '\n\n' : '') + content;
+          updateApp(selectedAppointment.id, { reportNotes: newNotes });
+          setSelectedAppointment({ ...selectedAppointment, reportNotes: newNotes });
+          setIsTemplateModalOpen(false);
+          showNotification(lang === 'hr' ? "Predložak primijenjen" : "Template applied");
       }
   };
 
@@ -512,26 +656,17 @@ export default function App() {
       { name: "Villa Kunterbunt", city: "Split", address: "Riva 5", cat: "consulting", req: "Beratung Anbau" },
       { name: "Bäckerei Schmidt", city: "Rijeka", address: "Korzo 12", cat: "emergency", req: "Rohrbruch im Keller" },
       { name: "Hotel Adriatic", city: "Zadar", address: "Obala 2", cat: "inspection", req: "Feuerschutz Check" },
-      { name: "Autohaus Fischer", city: "Osijek", address: "Vukovarska 50", cat: "inspection", req: "Werkstatt Abnahme" },
-      { name: "Privat: Hr. Horvat", city: "Pula", address: "Arena 1", cat: "consulting", req: "Schimmelanalyse" },
-      { name: "Büro Center West", city: "Zagreb", address: "Savska 100", cat: "inspection", req: "Aufzugsprüfung" },
-      { name: "Kita Sonnenschein", city: "Dubrovnik", address: "Stradun 1", cat: "emergency", req: "Stromausfall" },
-      { name: "Restaurant Plavi", city: "Šibenik", address: "Obala 4", cat: "inspection", req: "Hygieneinspektion" },
-      { name: "Logistikzentrum", city: "Varaždin", address: "Industrija 9", cat: "inspection", req: "Lüftungsanlage" }
+      { name: "Autohaus Fischer", city: "Osijek", address: "Vukovarska 50", cat: "inspection", req: "Werkstatt Abnahme" }
     ];
-    const statuses = ['incoming', 'incoming', 'pending', 'pending', 'review', 'review', 'done', 'done', 'archived', 'incoming'];
     try {
         const batchPromises = demoCustomers.map(async (c, i) => {
-            const randomStatus = statuses[i];
-            // Use real team members from DB for assignment, fallback to 'me' if empty
-            const randomMember = teamMembers.length > 0 ? teamMembers[i % teamMembers.length].id : 'me';
             const date = new Date();
             date.setDate(date.getDate() + (i - 2)); 
             const dateStr = date.toISOString().split('T')[0];
-            await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'appointments'), {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'appointments'), {
                 customerName: c.name, city: c.city, address: c.address, date: dateStr, time: `0${8 + (i%8)}:00`,
-                request: c.req, category: c.cat, status: randomStatus, assignedTo: randomMember, createdAt: serverTimestamp(),
-                todos: [ { text: t.defaultTask1, done: Math.random() > 0.5 }, { text: t.defaultTask2, done: Math.random() > 0.5 }, { text: t.defaultTask3, done: false }, { text: t.defaultTask4, done: false } ],
+                request: c.req, category: c.cat, status: 'incoming', assignedTo: 'me', createdAt: serverTimestamp(),
+                todos: [ { text: t.defaultTask1, done: false }, { text: t.defaultTask2, done: false }, { text: t.defaultTask3, done: false }, { text: t.defaultTask4, done: false } ],
                 reportImages: []
             });
         });
@@ -572,8 +707,15 @@ export default function App() {
       switch(adminView) {
           case 'templates': return (
               <div className="p-6 space-y-6">
-                  <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800">Templates</h2><div className="flex gap-2"><Button size="small" variant="secondary" icon={Upload}>Import</Button><Button size="small" icon={Plus}>New Template</Button></div></div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{MOCK_TEMPLATES.map(tpl => (<Card key={tpl.id} className="p-4 hover:border-blue-300 cursor-pointer group"><div className="flex justify-between mb-2"><FileText className="text-blue-500" size={24}/><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button className="p-1 hover:bg-slate-100 rounded"><Copy size={14}/></button><button className="p-1 hover:bg-slate-100 rounded"><Settings size={14}/></button></div></div><h3 className="font-bold text-slate-800">{tpl.name}</h3><div className="text-xs text-slate-500 mt-2 flex justify-between"><span>{tpl.author}</span><span>{tpl.created}</span></div></Card>))}</div>
+                  <div className="flex justify-between items-center">
+                      <h2 className="text-2xl font-bold text-slate-800">{t.menuTemplates}</h2>
+                      <div className="flex gap-2">
+                          <input type="file" accept=".json, .csv" className="hidden" ref={fileInputRef} onChange={handleImportTemplate}/>
+                          <Button size="small" variant="secondary" icon={Upload} onClick={() => fileInputRef.current.click()}>{t.import}</Button>
+                          <Button size="small" icon={Plus} onClick={() => { setTemplateModalMode('create'); setIsTemplateModalOpen(true); }}>{t.createTemplate}</Button>
+                      </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{templates.map(tpl => (<Card key={tpl.id} className="p-4 hover:border-blue-300 cursor-pointer group flex flex-col h-full"><div className="flex justify-between mb-2"><FileText className="text-blue-500" size={24}/><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button className="p-1 hover:bg-slate-100 rounded"><Copy size={14}/></button></div></div><h3 className="font-bold text-slate-800">{tpl.name}</h3><div className="text-xs text-slate-500 mt-2 flex justify-between"><span>{tpl.author}</span><span>{tpl.created}</span></div><p className="text-[10px] text-slate-400 mt-2 line-clamp-2">{tpl.content}</p></Card>))}</div>
               </div>);
           case 'employees': return (
               <div className="p-6 space-y-6">
@@ -586,9 +728,19 @@ export default function App() {
                 {isAddingEmployee && (
                     <Card className="p-4 bg-blue-50 border-blue-200 mb-6 animate-fade-in">
                         <h3 className="font-bold text-slate-700 mb-3">{t.newEmployee}</h3>
+                        <div className="text-xs bg-yellow-50 text-yellow-700 p-2 rounded mb-3 border border-yellow-200 flex items-start gap-2">
+                            <Info size={14} className="mt-0.5 flex-shrink-0"/>
+                            <span>Added employees must register with this exact email to gain access.</span>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                             <Input label={t.nameLabel} value={newEmployeeData.name} onChange={e => setNewEmployeeData({...newEmployeeData, name: e.target.value})} placeholder="Max Mustermann" />
-                            <Input label={t.roleLabel} value={newEmployeeData.role} onChange={e => setNewEmployeeData({...newEmployeeData, role: e.target.value})} placeholder="Inspector" />
+                            <div className="mb-3">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.roleLabel}</label>
+                                <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" value={newEmployeeData.role} onChange={e => setNewEmployeeData({...newEmployeeData, role: e.target.value})}>
+                                    <option value="staff">Staff (Standard)</option>
+                                    <option value="admin">Admin (Full Access)</option>
+                                </select>
+                            </div>
                             <Input label={t.emailLabel} value={newEmployeeData.email} onChange={e => setNewEmployeeData({...newEmployeeData, email: e.target.value})} placeholder="max@firma.com" />
                         </div>
                         <div className="flex justify-end gap-2">
@@ -604,7 +756,9 @@ export default function App() {
                             <img src={member.avatar} className="w-16 h-16 rounded-full border-2 border-slate-100 bg-white" />
                             <div className="flex-1">
                                 <h4 className="font-bold text-slate-800">{member.name}</h4>
-                                <p className="text-xs text-slate-500">{member.role}</p>
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${member.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>{member.role || 'staff'}</span>
+                                </div>
                                 <p className="text-xs text-blue-600 mt-1">{member.email}</p>
                             </div>
                             <button 
@@ -623,8 +777,7 @@ export default function App() {
           case 'calendar': 
               const year = calendarViewDate.getFullYear();
               const month = calendarViewDate.getMonth();
-              const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 = Sun, 1 = Mon ...
-              // Adjust for Monday start (standard in EU)
+              const firstDayOfMonth = new Date(year, month, 1).getDay(); 
               const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; 
               const daysInMonth = new Date(year, month + 1, 0).getDate();
               
@@ -643,20 +796,15 @@ export default function App() {
                       </div>
                       
                       <Card className="flex-1 flex flex-col p-4 overflow-hidden">
-                          {/* Weekdays Header */}
                           <div className="grid grid-cols-7 mb-2 text-center">
                               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                                   <div key={day} className="text-xs font-bold text-slate-400 uppercase py-2">{day}</div>
                               ))}
                           </div>
-                          {/* Calendar Grid */}
                           <div className="grid grid-cols-7 flex-1 auto-rows-fr gap-1">
-                              {/* Empty slots for start of month */}
                               {Array.from({ length: startDay }).map((_, i) => (
                                   <div key={`empty-${i}`} className="bg-slate-50/50 rounded-lg"></div>
                               ))}
-                              
-                              {/* Days */}
                               {Array.from({ length: daysInMonth }).map((_, i) => {
                                   const day = i + 1;
                                   const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -682,7 +830,6 @@ export default function App() {
               );
           case 'setup': return (
                 <div className="p-6 max-w-2xl"><h2 className="text-2xl font-bold text-slate-800 mb-6">System Setup</h2><Card className="p-6 space-y-6"><div><h3 className="font-bold text-slate-700 mb-4 border-b pb-2">Company Details</h3><Input label="Company Name" placeholder="DC Inspect GmbH" /><Input label="Address" placeholder="Musterstraße 1" /><div className="grid grid-cols-2 gap-4"><Input label="VAT ID" placeholder="ATU12345678" /><Input label="Email" placeholder="office@dc-inspect.com" /></div></div><div><h3 className="font-bold text-slate-700 mb-4 border-b pb-2">Integrations</h3><div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"><div className="flex items-center gap-3"><CloudLightning size={20} className="text-orange-500"/><span className="font-bold">n8n Automation</span></div><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">CONNECTED</span></div></div><Button fullWidth icon={Save}>Save Settings</Button>
-                {/* GENERATE DEMO DATA BUTTON */}
                 <div className="pt-4 border-t border-slate-100">
                     <h3 className="font-bold text-slate-700 mb-2">Developer Tools</h3>
                     <Button fullWidth variant="secondary" icon={Database} onClick={generateDemoData}>{t.genDataBtn}</Button>
@@ -690,7 +837,6 @@ export default function App() {
                 </Card></div>);
           case 'map': default: return (
                 <div className="p-6 space-y-6"><h2 className="text-2xl font-bold text-slate-800">Live Operations</h2><Card className="p-0 overflow-hidden relative h-96 bg-blue-50 border-blue-100 shadow-md"><div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(#2563EB 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><MapIcon size={64} className="text-blue-200" /></div>{appointments.filter(a => a.status === 'pending').map((p, i) => { 
-                    // Use real team data here
                     const assignee = teamMembers.find(m => m.id === p.assignedTo) || teamMembers[0] || { name: '?', avatar: '' };
                     return (<div key={p.id} className="absolute bg-white p-2 rounded-xl shadow-lg border border-slate-200 flex items-center gap-2 animate-bounce" style={{ top: `${20 + (i*15)}%`, left: `${20 + (i*20)}%` }}><img src={assignee.avatar} className="w-8 h-8 rounded-full border border-white shadow-sm"/><div><div className="text-xs font-bold text-slate-800 whitespace-nowrap">{assignee.name}</div><div className="text-[10px] text-slate-500 font-mono">{p.city}</div></div></div>) })}</Card></div>);
       }
@@ -727,6 +873,20 @@ export default function App() {
       );
   }
 
+  // 6. GUEST VIEW
+  if (view === 'guest') {
+      return (
+          <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mb-6">
+                  <UserX size={40} className="text-orange-500"/>
+              </div>
+              <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.guestTitle}</h1>
+              <p className="text-slate-500 mb-8 max-w-xs">{t.guestMessage}</p>
+              <Button onClick={handleLogout} variant="secondary" icon={LogOut}>{t.logout}</Button>
+          </div>
+      );
+  }
+
   // 4. TEAM / ADMIN DASHBOARD
   if (view === 'team') {
       return (
@@ -736,6 +896,26 @@ export default function App() {
                   {renderAdminContent()}
               </div>
               <Toast message={notification?.msg} type={notification?.type} onClose={() => setNotification(null)} />
+              
+              {/* TEMPLATE MODAL (Create Mode) */}
+              {isTemplateModalOpen && templateModalMode === 'create' && (
+                  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+                      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+                          <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                              <h3 className="font-bold text-lg text-slate-800">{t.createTemplate}</h3>
+                              <button onClick={() => setIsTemplateModalOpen(false)} className="p-1 hover:bg-slate-200 rounded-full"><X size={20}/></button>
+                          </div>
+                          <div className="p-6 space-y-4">
+                              <Input label={t.templateName} value={newTemplateData.name} onChange={e => setNewTemplateData({...newTemplateData, name: e.target.value})} placeholder="e.g. Roof Inspection" />
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.templateContent}</label>
+                                  <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg h-40 focus:ring-2 focus:ring-blue-500 outline-none text-sm" value={newTemplateData.content} onChange={e => setNewTemplateData({...newTemplateData, content: e.target.value})} placeholder="Template text..." />
+                              </div>
+                              <Button fullWidth onClick={createTemplate} icon={Save}>{t.save}</Button>
+                          </div>
+                      </div>
+                  </div>
+              )}
           </div>
       );
   }
