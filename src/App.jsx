@@ -7,7 +7,8 @@ import {
   Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, 
   Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, 
   UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, 
-  Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database, Info
+  Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database, Info,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { 
@@ -35,15 +36,14 @@ import {
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
-  apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-  authDomain: "dc-inspect.firebaseapp.com",
-  projectId: "dc-inspect",
-  storageBucket: "dc-inspect.firebasestorage.app",
-  messagingSenderId: "639013498118",
-  appId: "1:639013498118:web:15146029fbc159cbd30287",
-  measurementId: "G-5TETMHQ1EW"
+      apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+      authDomain: "dc-inspect.firebaseapp.com",
+      projectId: "dc-inspect",
+      storageBucket: "dc-inspect.firebasestorage.app",
+      messagingSenderId: "639013498118",
+      appId: "1:639013498118:web:15146029fbc159cbd30287",
+      measurementId: "G-5TETMHQ1EW"
 };
-
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 let app, auth, db;
@@ -139,7 +139,9 @@ const translations = {
     searchPlaceholder: "Pretraži klijente, gradove...", emptyArchive: "Arhiva je prazna", taskPlaceholder: "Novi zadatak...",
     reportTitle: "Izvještaj & Slike", demoSuccess: "Demo podaci generirani!",
     teamInit: "Tim je inicijaliziran",
-    addEmployee: "Dodaj Zaposlenika", newEmployee: "Novi Zaposlenik", nameLabel: "Ime", roleLabel: "Uloga", cancel: "Odustani"
+    addEmployee: "Dodaj Zaposlenika", newEmployee: "Novi Zaposlenik", nameLabel: "Ime", roleLabel: "Uloga", cancel: "Odustani",
+    autoSyncLabel: "Otvori Google Kalendar",
+    months: ["Siječanj", "Veljača", "Ožujak", "Travanj", "Svibanj", "Lipanj", "Srpanj", "Kolovoz", "Rujan", "Listopad", "Studeni", "Prosinac"]
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant",
@@ -166,7 +168,9 @@ const translations = {
     searchPlaceholder: "Search customers, cities...", emptyArchive: "Archive is empty", taskPlaceholder: "Add task...",
     reportTitle: "Report & Images", demoSuccess: "Demo data generated successfully!",
     teamInit: "Team database initialized",
-    addEmployee: "Add Employee", newEmployee: "New Employee", nameLabel: "Name", roleLabel: "Role", cancel: "Cancel"
+    addEmployee: "Add Employee", newEmployee: "New Employee", nameLabel: "Name", roleLabel: "Role", cancel: "Cancel",
+    autoSyncLabel: "Open Google Calendar",
+    months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
   }
 };
 
@@ -252,7 +256,7 @@ export default function App() {
   const t = translations[lang];
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [foodData, setFoodData] = useState([]);
-  const [formData, setFormData] = useState({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [], assignedTo: 'me' });
+  const [formData, setFormData] = useState({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [], assignedTo: 'me', autoSync: false });
   const [showSplash, setShowSplash] = useState(true);
   const [dailyQuote, setDailyQuote] = useState("");
   const [notification, setNotification] = useState(null);
@@ -262,8 +266,16 @@ export default function App() {
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
   const [newEmployeeData, setNewEmployeeData] = useState({ name: '', role: '', email: '' });
   const [deleteEmployeeId, setDeleteEmployeeId] = useState(null); // Fix for delete confirmation
+  
+  // Admin Calendar State
+  const [calendarViewDate, setCalendarViewDate] = useState(new Date());
 
   useEffect(() => { setDailyQuote(getRandomQuote()); const handleResize = () => setIsMobile(window.innerWidth <768); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, []);
+
+  // FIX: Scroll to top when view changes (Fixes issue where detail view starts scrolled down)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [view, selectedAppointment]);
 
   // Show notification helper
   const showNotification = (msg, type='success') => {
@@ -395,10 +407,16 @@ export default function App() {
 
   const saveApp = async (data) => {
     if(!user) return;
+    const { autoSync, ...dataToSave } = data;
     await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'appointments'), { 
-        ...data, status: 'incoming', createdAt: serverTimestamp(), reportImages:[],
+        ...dataToSave, status: 'incoming', createdAt: serverTimestamp(), reportImages:[],
         todos: [ { text: t.defaultTask1, done: false }, { text: t.defaultTask2, done: false }, { text: t.defaultTask3, done: false }, { text: t.defaultTask4, done: false } ]
     });
+
+    if (autoSync) {
+        openGoogleCalendar(dataToSave);
+    }
+
     setView('dashboard');
     showNotification("Saved successfully");
   };
@@ -589,7 +607,66 @@ export default function App() {
               </div>);
           case 'customers': return (
               <div className="p-6 space-y-6"><h2 className="text-2xl font-bold text-slate-800">Customers (CRM)</h2><Card className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th className="p-4">Customer</th><th className="p-4">Status</th><th className="p-4">Report</th><th className="p-4">Plan</th><th className="p-4 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{appointments.map(app => (<tr key={app.id} className="hover:bg-slate-50"><td className="p-4 font-bold text-slate-800">{app.customerName}<br/><span className="text-xs font-normal text-slate-500">{app.city}</span></td><td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${app.status === 'done' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{app.status || 'Active'}</span></td><td className="p-4 text-slate-500">{app.finalReport ? <CheckCircle size={16} className="text-green-500"/> : '-'}</td><td className="p-4"><span className="text-xs bg-slate-100 px-2 py-1 rounded">Standard</span></td><td className="p-4 text-right"><button className="text-blue-600 hover:underline">View</button></td></tr>))}</tbody></table></div></Card></div>);
-          case 'calendar': return (<div className="p-6 h-full flex flex-col"><h2 className="text-2xl font-bold text-slate-800 mb-6">Master Calendar</h2><div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 bg-[url('https://www.transparenttextures.com/patterns/graphy.png')]"><div className="text-center"><Calendar size={48} className="mx-auto mb-4 opacity-50"/><p>Google Calendar Integration Active</p><Button className="mt-4" variant="secondary" icon={ExternalLink} onClick={() => safeOpen("https://calendar.google.com")}>Open Google Calendar</Button></div></div></div>);
+          case 'calendar': 
+              const year = calendarViewDate.getFullYear();
+              const month = calendarViewDate.getMonth();
+              const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 = Sun, 1 = Mon ...
+              // Adjust for Monday start (standard in EU)
+              const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; 
+              const daysInMonth = new Date(year, month + 1, 0).getDate();
+              
+              const prevMonth = () => setCalendarViewDate(new Date(year, month - 1, 1));
+              const nextMonth = () => setCalendarViewDate(new Date(year, month + 1, 1));
+
+              return (
+                  <div className="p-6 h-full flex flex-col">
+                      <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-2xl font-bold text-slate-800">{t.menuCalendar}</h2>
+                        <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
+                             <button onClick={prevMonth} className="p-1 hover:bg-slate-100 rounded-lg"><ChevronLeft size={20}/></button>
+                             <span className="font-bold text-lg w-32 text-center">{t.months[month]} {year}</span>
+                             <button onClick={nextMonth} className="p-1 hover:bg-slate-100 rounded-lg"><ChevronRight size={20}/></button>
+                        </div>
+                      </div>
+                      
+                      <Card className="flex-1 flex flex-col p-4 overflow-hidden">
+                          {/* Weekdays Header */}
+                          <div className="grid grid-cols-7 mb-2 text-center">
+                              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                                  <div key={day} className="text-xs font-bold text-slate-400 uppercase py-2">{day}</div>
+                              ))}
+                          </div>
+                          {/* Calendar Grid */}
+                          <div className="grid grid-cols-7 flex-1 auto-rows-fr gap-1">
+                              {/* Empty slots for start of month */}
+                              {Array.from({ length: startDay }).map((_, i) => (
+                                  <div key={`empty-${i}`} className="bg-slate-50/50 rounded-lg"></div>
+                              ))}
+                              
+                              {/* Days */}
+                              {Array.from({ length: daysInMonth }).map((_, i) => {
+                                  const day = i + 1;
+                                  const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                  const dayApps = appointments.filter(a => a.date === dateStr);
+                                  const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+                                  
+                                  return (
+                                      <div key={day} className={`border rounded-lg p-2 overflow-hidden flex flex-col ${isToday ? 'border-blue-400 bg-blue-50/30' : 'border-slate-100 bg-white hover:border-blue-200'}`}>
+                                          <span className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{day}</span>
+                                          <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
+                                              {dayApps.map(app => (
+                                                  <div key={app.id} onClick={() => { setSelectedAppointment(app); setView('detail'); }} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-1 rounded border-l-2 border-blue-500 truncate cursor-pointer hover:bg-blue-200" title={`${app.time} - ${app.customerName}`}>
+                                                      {app.time} {app.customerName}
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      </Card>
+                  </div>
+              );
           case 'setup': return (
                 <div className="p-6 max-w-2xl"><h2 className="text-2xl font-bold text-slate-800 mb-6">System Setup</h2><Card className="p-6 space-y-6"><div><h3 className="font-bold text-slate-700 mb-4 border-b pb-2">Company Details</h3><Input label="Company Name" placeholder="DC Inspect GmbH" /><Input label="Address" placeholder="Musterstraße 1" /><div className="grid grid-cols-2 gap-4"><Input label="VAT ID" placeholder="ATU12345678" /><Input label="Email" placeholder="office@dc-inspect.com" /></div></div><div><h3 className="font-bold text-slate-700 mb-4 border-b pb-2">Integrations</h3><div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"><div className="flex items-center gap-3"><CloudLightning size={20} className="text-orange-500"/><span className="font-bold">n8n Automation</span></div><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">CONNECTED</span></div></div><Button fullWidth icon={Save}>Save Settings</Button>
                 {/* GENERATE DEMO DATA BUTTON */}
@@ -685,6 +762,18 @@ export default function App() {
             )}
 
             <div className="mb-4"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.labelCategory}</label><select className="w-full p-3 border rounded-lg bg-slate-50 text-slate-900" value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})}><option value="inspection">Inspection</option><option value="consulting">Consulting</option><option value="emergency">Emergency</option></select></div>
+            
+            {/* GOOGLE CALENDAR SYNC CHECKBOX */}
+            <div className="mb-6 flex items-center gap-3 p-3 bg-blue-50 border border-blue-100 rounded-lg cursor-pointer" onClick={() => setFormData({...formData, autoSync: !formData.autoSync})}>
+                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.autoSync ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300'}`}>
+                    {formData.autoSync && <Check size={14} />}
+                </div>
+                <div className="flex-1">
+                    <span className="text-sm font-bold text-slate-700 flex items-center gap-2"><CalendarPlus size={16} className="text-blue-500"/> {t.autoSyncLabel}</span>
+                    <p className="text-[10px] text-slate-500 leading-tight">Create Google Calendar event after saving</p>
+                </div>
+            </div>
+
             <Button fullWidth onClick={() => saveApp(formData)} icon={Save}>{t.save}</Button>
           </Card>
         </div>
@@ -816,7 +905,7 @@ export default function App() {
       <div className="fixed bottom-6 right-6 z-30">
           {/* Create Button only for Admin */}
           {role === 'admin' && (
-              <button onClick={() => { setFormData({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [], assignedTo: 'me' }); setView('add'); }} className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl shadow-blue-200 flex items-center justify-center transition-transform active:scale-90"><Plus size={28} /></button>
+              <button onClick={() => { setFormData({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [], assignedTo: 'me', autoSync: false }); setView('add'); }} className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl shadow-blue-200 flex items-center justify-center transition-transform active:scale-90"><Plus size={28} /></button>
           )}
       </div>
       <Toast message={notification?.msg} type={notification?.type} onClose={() => setNotification(null)} />
