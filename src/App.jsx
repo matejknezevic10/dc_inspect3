@@ -60,7 +60,6 @@ try {
 }
 
 // --- INITIAL DATA (Used for seeding DB only) ---
-// Diese Daten werden jetzt einmalig in die Datenbank geladen, falls diese leer ist.
 const INITIAL_TEAM_MEMBERS = [
   { id: 'me', name: 'Ich (Admin)', role: 'Geschäftsführer', email: 'boss@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
   { id: 'anna', name: 'Anna Müller', role: 'Senior Inspektor', email: 'anna@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna' },
@@ -196,8 +195,8 @@ const Button = ({children, onClick, variant='primary', className='', icon:Icon, 
 const Input = ({label, type="text", ...p}) => (<div className="mb-3"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label><input type={type} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" {...p}/></div>);
 const Select = ({ label, options, ...props }) => ( <div className="mb-4"> <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label> <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-900" {...props}> {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)} </select> </div> );
 
-// Updated KanbanColumn to accept teamMembers as a prop
-const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange, isMobile, teamMembers }) => {
+// Updated KanbanColumn to accept teamMembers and ROLE
+const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange, isMobile, teamMembers, role }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const handleDragOver = (e) => { e.preventDefault(); setIsDragOver(true); };
   const handleDragLeave = (e) => { e.preventDefault(); setIsDragOver(false); };
@@ -221,8 +220,17 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
         {appointments.length===0 ? <div className="text-center py-10 text-slate-300 italic text-xs">{isDragOver?'Drop here':'Empty'}</div> : appointments.map(app => {
             // Find assignee in the real data or fallback to the first one
             const assignee = teamMembers.find(m => m.id === app.assignedTo) || teamMembers[0] || { name: '?', avatar: '' };
+            // ADMIN CHECK: Only admin can drag
+            const isAdmin = role === 'admin';
+            
             return (
-            <div key={app.id} draggable onDragStart={(e)=>{e.dataTransfer.setData("appId",app.id);e.dataTransfer.effectAllowed="move";}} onClick={()=>onClickApp(app)} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98] group relative">
+            <div 
+                key={app.id} 
+                draggable={isAdmin} // Disable drag for non-admins
+                onDragStart={(e)=>{ if(isAdmin) { e.dataTransfer.setData("appId",app.id);e.dataTransfer.effectAllowed="move"; }}} 
+                onClick={()=>onClickApp(app)} 
+                className={`bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98] group relative ${isAdmin ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+            >
               <div className="flex justify-between items-start mb-2">
                   <h4 className="font-bold text-slate-800 text-sm">{app.customerName}</h4>
                   <img src={assignee.avatar} className="w-6 h-6 rounded-full border border-slate-200" alt={assignee.name} title={assignee.name} />
@@ -287,7 +295,10 @@ export default function App() {
   // STEP 1 IMPLEMENTATION: Fetch Team from Firestore
   // -------------------------------------------------------------
   useEffect(() => {
-      if (!db) return;
+      // FIX: Wait for user authentication before fetching public data
+      // This prevents "Missing or insufficient permissions" errors on app load
+      if (!db || !user) return;
+      
       // Using a PUBLIC collection so all authenticated users can see the team list
       // Path: /artifacts/{appId}/public/data/team_members
       const teamColRef = collection(db, 'artifacts', appId, 'public', 'data', 'team_members');
@@ -308,9 +319,11 @@ export default function App() {
               const members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
               setTeamMembers(members);
           }
+      }, (err) => {
+          console.error("Team Fetch Error:", err);
       });
       return () => unsubscribe();
-  }, []);
+  }, [user]); // FIX: Added 'user' dependency to ensure auth is ready
 
   // Updated Init & Auth Effect
   useEffect(() => {
@@ -818,12 +831,15 @@ export default function App() {
               {a.status === 'pending' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'incoming')} icon={Undo}>{t.moveToIncoming}</Button>}
               {a.status === 'pending' && <Button variant="purple" onClick={() => handleUpdateStatus(a.id, 'review')}>{t.moveToReview}</Button>}
 
+              {/* Status Change Buttons Restricted by Role */}
               {a.status === 'review' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'pending')} icon={Undo}>Back to Pending</Button>}
-              {a.status === 'review' && <Button variant="success" onClick={() => handleUpdateStatus(a.id, 'done')}>{t.moveToDone}</Button>}
+              {a.status === 'review' && role === 'admin' && <Button variant="success" onClick={() => handleUpdateStatus(a.id, 'done')}>{t.moveToDone}</Button>}
               
-              {a.status === 'done' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'review')} icon={Undo}>{t.restore}</Button>}
-              {a.status === 'done' && <Button variant="gray" onClick={() => handleUpdateStatus(a.id, 'archived')} icon={FolderArchive}>{t.moveToArchived}</Button>}
-              {a.status === 'archived' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'done')} icon={Undo}>{t.restoreFromArchive}</Button>}
+              {a.status === 'done' && role === 'admin' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'review')} icon={Undo}>{t.restore}</Button>}
+              {a.status === 'done' && role === 'admin' && <Button variant="gray" onClick={() => handleUpdateStatus(a.id, 'archived')} icon={FolderArchive}>{t.moveToArchived}</Button>}
+              
+              {a.status === 'archived' && role === 'admin' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'done')} icon={Undo}>{t.restoreFromArchive}</Button>}
+              
               <Button variant="secondary" onClick={() => openGoogleCalendar(a)} icon={CalendarPlus}>{t.addToCalendar}</Button>
            </Card>
            
@@ -881,21 +897,21 @@ export default function App() {
               {/* DESKTOP VIEW: Edge to Edge Columns */}
               {!isMobile && (
                   <div className="flex flex-row h-full w-full divide-x divide-slate-200">
-                      {/* Pass teamMembers Prop */}
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} /></div>
+                      {/* Pass teamMembers Prop and ROLE */}
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
                   </div>
               )}
               {/* MOBILE VIEW: Stacked with Padding */}
               {isMobile && (
                   <div className="flex flex-col gap-4 p-4 overflow-y-auto h-full custom-scrollbar">
-                      {/* Pass teamMembers Prop */}
-                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} />
-                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} />
-                      <KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} />
-                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} />
+                      {/* Pass teamMembers Prop and ROLE */}
+                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
+                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
+                      <KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
+                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
                   </div>
               )}
             </>
