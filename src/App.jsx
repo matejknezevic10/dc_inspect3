@@ -23,13 +23,14 @@ try {
     // -----------------------------------------------------------
     // HIER DEINE DATEN EINTRAGEN (aus der Firebase Console)
     // -----------------------------------------------------------
-    firebaseConfig = {
-      apiKey: "AIzaSyC5iiD920I3NKRuYUJl9_IvXPWeMyQamQI",
-      authDomain: "mini-plane.firebaseapp.com",
-      projectId: "mini-plane",
-      storageBucket: "mini-plane.firebasestorage.app",
-      messagingSenderId: "962821978722",
-      appId: "1:962821978722:web:192972b451ef93fd112f3b"
+    const firebaseConfig = {
+      apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+      authDomain: "dc-inspect.firebaseapp.com",
+      projectId: "dc-inspect",
+      storageBucket: "dc-inspect.firebasestorage.app",
+      messagingSenderId: "639013498118",
+      appId: "1:639013498118:web:15146029fbc159cbd30287",
+      measurementId: "G-5TETMHQ1EW"
     };
   }
 } catch (e) { console.error("Config Error", e); }
