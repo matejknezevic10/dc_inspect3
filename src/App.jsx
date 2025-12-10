@@ -105,8 +105,7 @@ const translations = {
     gasTitle: "Gorivo", gasDesc: "Cijene u blizini", gasButton: "Traži benzinske (GPS)",
     foodTitle: "Hrana", foodSubtitle: "Preporuka rute",
     moveToPending: "Započni", moveToReview: "Na Pregled", moveToDone: "Završi", restore: "Vrati", moveToIncoming: "Vrati u nove",
-    moveToArchived: "Arhiviraj", restoreFromArchive: "Vrati u završeno",
-    syncNote: "Za sinkronizaciju koristite isti račun na svim uređajima."
+    moveToArchived: "Arhiviraj", restoreFromArchive: "Vrati u završeno"
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant",
@@ -128,8 +127,7 @@ const translations = {
     gasTitle: "Fuel", gasDesc: "Prices nearby", gasButton: "Search Gas Stations (GPS)",
     foodTitle: "Food", foodSubtitle: "Route recommendation",
     moveToPending: "Start Working", moveToReview: "Submit for Review", moveToDone: "Complete", restore: "Restore", moveToIncoming: "Move to Incoming",
-    moveToArchived: "Archive", restoreFromArchive: "Restore to Done",
-    syncNote: "To sync, use the same account on all devices."
+    moveToArchived: "Archive", restoreFromArchive: "Restore to Done"
   }
 };
 
@@ -148,13 +146,12 @@ const openGoogleCalendar = (app) => { const startDate = new Date(`${app.date}T${
 const Card = ({children, className='', onClick}) => (<div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>{children}</div>);
 
 const Button = ({children, onClick, variant='primary', className='', icon:Icon, fullWidth, ...p}) => {
-  const vs = { primary: "bg-blue-600 text-white hover:bg-blue-700", secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50", success: "bg-green-600 text-white hover:bg-green-700", danger: "bg-red-50 text-red-600 hover:bg-red-100", orange: "bg-orange-500 text-white hover:bg-orange-600", purple: "bg-indigo-500 text-white hover:bg-indigo-600", gray: "bg-slate-200 text-slate-700 hover:bg-slate-300" };
+  const vs = { primary: "bg-blue-600 text-white hover:bg-blue-700", secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50", success: "bg-green-600 text-white hover:bg-green-700", danger: "bg-red-50 text-red-600 hover:bg-red-100", orange: "bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100", purple: "bg-indigo-500 text-white hover:bg-indigo-600", gray: "bg-slate-200 text-slate-700 hover:bg-slate-300" };
   return <button onClick={onClick} className={`flex items-center justify-center px-4 py-3 rounded-lg font-bold text-sm transition-all active:scale-95 ${vs[variant]} ${fullWidth ? 'w-full' : ''} ${className}`} {...p}>{Icon && <Icon size={18} className="mr-2"/>}{children}</button>;
 };
 
-// FIX: Label color set to text-slate-800 to ensure visibility
-const Input = ({label, type="text", ...p}) => (<div className="mb-3"><label className="block text-xs font-bold text-slate-800 uppercase mb-1">{label}</label><input type={type} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" {...p}/></div>);
-const Select = ({ label, options, ...props }) => ( <div className="mb-4"> <label className="block text-xs font-bold text-slate-800 uppercase mb-1">{label}</label> <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-900" {...props}> {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)} </select> </div> );
+const Input = ({label, type="text", ...p}) => (<div className="mb-3"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label><input type={type} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" {...p}/></div>);
+const Select = ({ label, options, ...props }) => ( <div className="mb-4"> <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label> <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-900" {...props}> {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)} </select> </div> );
 
 const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange, isMobile }) => {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -382,6 +379,14 @@ export default function App() {
               </div>
           )}
           
+          {/* MOBILE: Back Button within Sidebar */}
+          {isMobile && (
+            <div className="bg-slate-800 p-2 flex items-center gap-2 border-b border-slate-700">
+                 <button onClick={() => setView('dashboard')} className="p-1 rounded bg-slate-700 hover:bg-slate-600"><ArrowLeft size={16}/></button>
+                 <span className="text-xs font-bold text-slate-300">BACK TO BOARD</span>
+            </div>
+          )}
+          
           <nav className={`flex-1 overflow-y-auto p-2 space-y-2 ${isMobile ? 'flex flex-row overflow-x-auto space-x-2 space-y-0 p-3 bg-slate-900 shadow-xl' : 'flex-col'}`}>
               {[ { id: 'map', label: t.menuOverview, icon: MapIcon }, { id: 'templates', label: t.menuTemplates, icon: FileBox }, { id: 'employees', label: t.menuEmployees, icon: Users }, { id: 'customers', label: t.menuCustomers, icon: Briefcase }, { id: 'calendar', label: t.menuCalendar, icon: Calendar }, { id: 'setup', label: t.menuSetup, icon: Settings } ].map(item => (
                   <button key={item.id} onClick={() => setAdminView(item.id)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isMobile ? 'flex-col justify-center min-w-[80px] p-2' : 'w-full text-left'} ${adminView === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
@@ -448,7 +453,7 @@ export default function App() {
       );
   }
 
-  // 4. TEAM / ADMIN DASHBOARD (New Layout)
+  // 4. TEAM / ADMIN DASHBOARD
   if (view === 'team') {
       return (
           <div className={`min-h-screen bg-slate-50 font-sans text-slate-900 ${isMobile ? 'flex-col' : 'flex'}`}>
@@ -479,21 +484,16 @@ export default function App() {
             <Input label={t.labelAddress} value={formData.address} onChange={e=>setFormData({...formData, address:e.target.value})} />
             <Input label={t.labelRequest} value={formData.request} onChange={e=>setFormData({...formData, request:e.target.value})} />
             
-            {/* Team Assignment - Dropdown version */}
             {role === 'admin' && (
                 <div className="mb-4">
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.labelAssign}</label>
-                    <div className="relative">
-                        <select 
-                            className="w-full p-3 pl-10 border rounded-lg bg-slate-50 text-slate-900 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.assignedTo}
-                            onChange={(e) => setFormData({...formData, assignedTo: e.target.value})}
-                        >
-                            {TEAM_MEMBERS.map(m => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                            ))}
-                        </select>
-                        <Users size={18} className="absolute left-3 top-3 text-slate-400 pointer-events-none"/>
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                        {TEAM_MEMBERS.map(m => (
+                            <button key={m.id} onClick={() => setFormData({...formData, assignedTo: m.id})} className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${formData.assignedTo === m.id ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}>
+                                <img src={m.avatar} className="w-5 h-5 rounded-full"/>
+                                <span className="text-xs font-bold whitespace-nowrap">{m.name}</span>
+                            </button>
+                        ))}
                     </div>
                 </div>
             )}
@@ -524,30 +524,26 @@ export default function App() {
         </div>
 
         <div className="px-4 -mt-10 relative z-10 w-full max-w-4xl mx-auto space-y-4">
-           
-           <div className="flex items-center justify-between bg-white/90 backdrop-blur p-2 rounded-lg shadow-sm border border-white/50 text-xs font-medium text-slate-600">
-                <span>{t.assignTo}</span>
-                {role === 'admin' ? (
-                    <select 
-                        className="bg-transparent border-none font-bold text-blue-600 focus:ring-0 text-right cursor-pointer"
-                        value={a.assignedTo}
-                        onChange={(e) => {
-                             updateApp(a.id, { assignedTo: e.target.value });
-                             setSelectedAppointment({...a, assignedTo: e.target.value});
-                        }}
-                    >
-                        {TEAM_MEMBERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                ) : (
-                    <div className="flex items-center gap-2"><img src={assignee.avatar} className="w-5 h-5 rounded-full"/><span>{assignee.name}</span></div>
-                )}
-           </div>
-
+           {role === 'admin' && (
+               <div className="flex items-center justify-between bg-white/90 backdrop-blur p-2 rounded-lg shadow-sm border border-white/50 text-xs font-medium text-slate-600"><span>{t.assignTo}</span><div className="flex items-center gap-2"><img src={assignee.avatar} className="w-5 h-5 rounded-full"/><span>{assignee.name}</span></div>
+                    <div className="flex gap-2 overflow-x-auto pb-1 pt-1 border-t border-slate-200">
+                        {TEAM_MEMBERS.map(m => (
+                            <button key={m.id} onClick={() => { updateApp(a.id, { assignedTo: m.id }); setSelectedAppointment({...a, assignedTo: m.id}); }} className={`flex-shrink-0 w-8 h-8 rounded-full border-2 ${a.assignedTo === m.id ? 'border-blue-500' : 'border-transparent opacity-50'}`}>
+                                <img src={m.avatar} className="w-full h-full rounded-full" title={m.name} />
+                            </button>
+                        ))}
+                    </div>
+               </div>
+           )}
            <Card className="p-3 grid grid-cols-2 gap-3">
               {a.status === 'incoming' && <Button variant="orange" onClick={() => handleUpdateStatus(a.id, 'pending')}>{t.moveToPending}</Button>}
               {a.status === 'pending' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'incoming')} icon={Undo}>{t.moveToIncoming}</Button>}
-              {a.status === 'pending' && <Button variant="success" onClick={() => handleUpdateStatus(a.id, 'done')}>{t.moveToDone}</Button>}
-              {a.status === 'done' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'pending')} icon={Undo}>{t.restore}</Button>}
+              {a.status === 'pending' && <Button variant="purple" onClick={() => handleUpdateStatus(a.id, 'review')}>{t.moveToReview}</Button>}
+
+              {a.status === 'review' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'pending')} icon={Undo}>Back to Pending</Button>}
+              {a.status === 'review' && <Button variant="success" onClick={() => handleUpdateStatus(a.id, 'done')}>{t.moveToDone}</Button>}
+              
+              {a.status === 'done' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'review')} icon={Undo}>{t.restore}</Button>}
               {a.status === 'done' && <Button variant="gray" onClick={() => handleUpdateStatus(a.id, 'archived')} icon={FolderArchive}>{t.moveToArchived}</Button>}
               {a.status === 'archived' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'done')} icon={Undo}>{t.restoreFromArchive}</Button>}
               <Button variant="secondary" onClick={() => openGoogleCalendar(a)} icon={CalendarPlus}>{t.addToCalendar}</Button>
