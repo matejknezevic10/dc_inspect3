@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, Shield
+  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { 
@@ -16,21 +16,12 @@ import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc
 
 // --- Firebase Configuration ---
 let firebaseConfig;
-let initError = "";
-
 try {
-  // Versuch 1: Automatische Config (Preview Umgebung)
   if (typeof __firebase_config !== 'undefined') {
     firebaseConfig = JSON.parse(__firebase_config);
-  } 
-} catch (e) { console.warn("Auto-Config failed:", e); }
-
-// Versuch 2: Manuelle Config (Lokal / Fallback)
-if (!firebaseConfig) {
+  } else {
     // -----------------------------------------------------------
-    // WICHTIG FÜR LOKALES TESTEN:
-    // Ersetze diesen Block mit deinen ECHTEN Daten aus der Firebase Console!
-    // (Project Settings -> General -> Your apps -> SDK setup/config)
+    // HIER DEINE DATEN EINTRAGEN (aus der Firebase Console)
     // -----------------------------------------------------------
     firebaseConfig = {
       apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
@@ -41,32 +32,31 @@ if (!firebaseConfig) {
       appId: "1:639013498118:web:15146029fbc159cbd30287",
       measurementId: "G-5TETMHQ1EW"
     };
-}
+  }
+} catch (e) { console.error("Config Error", e); }
 
 let app, auth, db;
 try {
-  // Prüfen, ob wir nur den Platzhalter haben (dann wird Auth fehlschlagen)
-  if (firebaseConfig.apiKey === "HIER_DEIN_API_KEY_EINFÜGEN" && typeof __firebase_config === 'undefined') {
-     console.warn("ACHTUNG: Firebase Config sind nur Platzhalter!");
-     initError = "Platzhalter-Config erkannt. Bitte echte Daten in src/App.jsx eintragen.";
-  }
-  
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
-} catch (error) { 
-    console.error("Firebase Init Error:", error); 
-    initError = error.message;
-}
+} catch (error) { console.error("Firebase Init Error:", error); }
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // --- MOCK DATA ---
 const TEAM_MEMBERS = [
-  { id: 'me', name: 'Ich (Admin)', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
-  { id: 'anna', name: 'Anna Müller', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna' },
-  { id: 'max', name: 'Max Mustermann', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
-  { id: 'tom', name: 'Tom B.', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tom' },
+  { id: 'me', name: 'Ich (Admin)', role: 'Geschäftsführer', email: 'boss@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
+  { id: 'anna', name: 'Anna Müller', role: 'Senior Inspektor', email: 'anna@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna' },
+  { id: 'max', name: 'Max Mustermann', role: 'Junior Inspektor', email: 'max@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
+  { id: 'tom', name: 'Tom B.', role: 'Techniker', email: 'tom@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tom' },
+];
+
+const MOCK_TEMPLATES = [
+    { id: 1, name: "Standard Hausinspektion", created: "2024-01-10", author: "Ich (Admin)" },
+    { id: 2, name: "Wasserschaden Analyse", created: "2024-02-15", author: "Anna Müller" },
+    { id: 3, name: "Dach & Fassade", created: "2024-03-01", author: "Ich (Admin)" },
+    { id: 4, name: "Elektro-Check (VDE)", created: "2024-03-20", author: "Tom B." }
 ];
 
 const getRandomQuote = () => {
@@ -98,7 +88,7 @@ const translations = {
   hr: {
     appTitle: "DC INSPECT", subtitle: "Mobilni Asistent",
     navDashboard: "Dashboard", navArchive: "Arhiv", navTeam: "Tim / Mapa",
-    colIncoming: "NOVI", colPending: "U TIJEKU", colReview: "PREGLED", colDone: "ZAVRŠENO", colArchived: "ARHIVIRANO",
+    colIncoming: "NOVI", colPending: "U TIJEKU", colDone: "ZAVRŠENO", colArchived: "ARHIVIRANO",
     loginTitle: "Dobrodošli", loginBtn: "Prijavi se", registerBtn: "Registracija",
     emailLabel: "Email adresa", passLabel: "Lozinka",
     logout: "Odjava",
@@ -267,7 +257,7 @@ export default function App() {
     } else {
         setLoading(false);
         // If auth is missing, we likely have a config error
-        if(initError) setErrorMsg("Firebase Setup Error: " + initError);
+        if(initError || !firebaseConfig) setErrorMsg("Firebase Setup Error. Please check your config.");
     }
   }, []);
 
@@ -336,7 +326,7 @@ export default function App() {
       }
   };
 
-  const handleLogout = async () => { if(auth) await signOut(auth); };
+  const handleLogout = async () => { await signOut(auth); };
 
   const saveApp = async (data) => {
     if(!user || !db) return;
@@ -428,7 +418,12 @@ export default function App() {
           case 'calendar': return (<div className="p-6 h-full flex flex-col"><h2 className="text-2xl font-bold text-slate-800 mb-6">Master Calendar</h2><div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 bg-[url('https://www.transparenttextures.com/patterns/graphy.png')]"><div className="text-center"><Calendar size={48} className="mx-auto mb-4 opacity-50"/><p>Google Calendar Integration Active</p><Button className="mt-4" variant="secondary" icon={ExternalLink} onClick={() => safeOpen("https://calendar.google.com")}>Open Google Calendar</Button></div></div></div>);
           case 'setup': return (
                 <div className="p-6 max-w-2xl"><h2 className="text-2xl font-bold text-slate-800 mb-6">System Setup</h2><Card className="p-6 space-y-6"><div><h3 className="font-bold text-slate-700 mb-4 border-b pb-2">Company Details</h3><Input label="Company Name" placeholder="DC Inspect GmbH" /><Input label="Address" placeholder="Musterstraße 1" /><div className="grid grid-cols-2 gap-4"><Input label="VAT ID" placeholder="ATU12345678" /><Input label="Email" placeholder="office@dc-inspect.com" /></div></div><div><h3 className="font-bold text-slate-700 mb-4 border-b pb-2">Integrations</h3><div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"><div className="flex items-center gap-3"><CloudLightning size={20} className="text-orange-500"/><span className="font-bold">n8n Automation</span></div><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">CONNECTED</span></div></div><Button fullWidth icon={Save}>Save Settings</Button>
-                <div className="pt-4 border-t border-slate-100"><h3 className="font-bold text-slate-700 mb-2">Developer Tools</h3><Button fullWidth variant="secondary" icon={Database} onClick={generateDemoData}>{t.genDataBtn}</Button></div></Card></div>);
+                {/* GENERATE DEMO DATA BUTTON */}
+                <div className="pt-4 border-t border-slate-100">
+                    <h3 className="font-bold text-slate-700 mb-2">Developer Tools</h3>
+                    <Button fullWidth variant="secondary" icon={Database} onClick={generateDemoData}>{t.genDataBtn}</Button>
+                </div>
+                </Card></div>);
           case 'map': default: return (
                 <div className="p-6 space-y-6"><h2 className="text-2xl font-bold text-slate-800">Live Operations</h2><Card className="p-0 overflow-hidden relative h-96 bg-blue-50 border-blue-100 shadow-md"><div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(#2563EB 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><MapIcon size={64} className="text-blue-200" /></div>{appointments.filter(a => a.status === 'pending').map((p, i) => { const assignee = TEAM_MEMBERS.find(m => m.id === p.assignedTo) || TEAM_MEMBERS[0]; return (<div key={p.id} className="absolute bg-white p-2 rounded-xl shadow-lg border border-slate-200 flex items-center gap-2 animate-bounce" style={{ top: `${20 + (i*15)}%`, left: `${20 + (i*20)}%` }}><img src={assignee.avatar} className="w-8 h-8 rounded-full border border-white shadow-sm"/><div><div className="text-xs font-bold text-slate-800 whitespace-nowrap">{assignee.name}</div><div className="text-[10px] text-slate-500 font-mono">{p.city}</div></div></div>) })}</Card></div>);
       }
@@ -571,7 +566,7 @@ export default function App() {
            
            <Button onClick={() => safeOpen(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${a.address}, ${a.city}`)}`)} className="w-full shadow-md bg-blue-600 text-white py-4" icon={Navigation} variant="primary">{t.navStart}</Button>
            
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><p className="text-xs text-slate-500 mb-3">{t.gasDesc}</p><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => triggerStationNav(f.name, a.city)}><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card></div>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => triggerStationNav(f.name, a.city)}><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card></div>
            
            <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><FileText size={16}/> {t.reportTitle}</h3><div className="flex gap-2 overflow-x-auto pb-4 mb-2"><label className="flex-shrink-0 w-16 h-16 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-50"><Camera size={20}/><input type="file" className="hidden" accept="image/*" onChange={async (e) => { if(e.target.files[0]) { const b64 = await compressImage(e.target.files[0]); const n=[...(a.reportImages||[]), b64]; updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }}}/></label>{(a.reportImages||[]).map((img, i) => (<div key={i} className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200"><img src={img} className="w-full h-full object-cover"/><button onClick={() => { const n = a.reportImages.filter((_, idx) => idx !== i); updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5"><X size={10}/></button></div>))}</div><div className="space-y-2"><textarea className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm min-h-[100px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={t.reportNotesPlaceholder} value={a.reportNotes || ''} onChange={(e) => { setSelectedAppointment({...a, reportNotes: e.target.value}); }} /><Button fullWidth onClick={() => handleReportUpdate(a.reportNotes || '')} icon={Wand2}>{t.generateBtn}</Button></div>{a.finalReport && (<div className="mt-4 pt-4 border-t border-slate-100"><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.reportResultLabel}</label><div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono whitespace-pre-wrap mb-4 max-h-40 overflow-y-auto">{a.finalReport}</div><div className="flex gap-2"><Button size="small" variant="secondary" icon={Printer} onClick={() => printAsPdf(a.finalReport, a.reportImages)}>{t.downloadPdf}</Button><Button size="small" variant="secondary" icon={Download} onClick={() => downloadAsWord(a.finalReport, a.customerName, a.reportImages)}>{t.downloadDoc}</Button></div></div>)}</Card>
            <div className="pt-8 pb-4"><Button fullWidth variant="danger" icon={Trash2} onClick={() => deleteApp(a.id)}>{t.delete}</Button></div>
