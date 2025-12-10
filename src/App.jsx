@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database
+  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, 
+  Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, 
+  TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, 
+  Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, 
+  Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, 
+  Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, 
+  UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, 
+  Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database, Info
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { 
@@ -12,40 +19,49 @@ import {
   signInAnonymously,
   signInWithCustomToken
 } from "firebase/auth";
-import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, serverTimestamp, setDoc, getDoc } from "firebase/firestore";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  deleteDoc, 
+  doc, 
+  updateDoc, 
+  serverTimestamp, 
+  setDoc, 
+  getDoc,
+  writeBatch
+} from "firebase/firestore";
 
 // --- Firebase Configuration ---
-let firebaseConfig;
-try {
-  if (typeof __firebase_config !== 'undefined') {
-    firebaseConfig = JSON.parse(__firebase_config);
-  } else {
-    // -----------------------------------------------------------
-    // HIER DEINE DATEN EINTRAGEN (aus der Firebase Console)
-    // -----------------------------------------------------------
-    firebaseConfig = {
-      apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-      authDomain: "dc-inspect.firebaseapp.com",
-      projectId: "dc-inspect",
-      storageBucket: "dc-inspect.firebasestorage.app",
-      messagingSenderId: "639013498118",
-      appId: "1:639013498118:web:15146029fbc159cbd30287",
-      measurementId: "G-5TETMHQ1EW"
-    };
-  }
-} catch (e) { console.error("Config Error", e); }
-
-let app, auth, db;
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (error) { console.error("Firebase Init Error:", error); }
+const firebaseConfig = {
+  apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+  authDomain: "dc-inspect.firebaseapp.com",
+  projectId: "dc-inspect",
+  storageBucket: "dc-inspect.firebasestorage.app",
+  messagingSenderId: "639013498118",
+  appId: "1:639013498118:web:15146029fbc159cbd30287",
+  measurementId: "G-5TETMHQ1EW"
+};
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- MOCK DATA ---
-const TEAM_MEMBERS = [
+let app, auth, db;
+try {
+  if (Object.keys(firebaseConfig).length > 0) {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } else {
+    console.error("Firebase config missing");
+  }
+} catch (error) {
+  console.error("Firebase Init Error:", error);
+}
+
+// --- INITIAL DATA (Used for seeding DB only) ---
+// Diese Daten werden jetzt einmalig in die Datenbank geladen, falls diese leer ist.
+const INITIAL_TEAM_MEMBERS = [
   { id: 'me', name: 'Ich (Admin)', role: 'Geschäftsführer', email: 'boss@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
   { id: 'anna', name: 'Anna Müller', role: 'Senior Inspektor', email: 'anna@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna' },
   { id: 'max', name: 'Max Mustermann', role: 'Junior Inspektor', email: 'max@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
@@ -66,7 +82,20 @@ const getRandomQuote = () => {
   return quotes[Math.floor(Math.random() * quotes.length)];
 };
 
-// --- Components ---
+// --- Helper Components ---
+
+const Toast = ({ message, type, onClose }) => {
+  if (!message) return null;
+  const bg = type === 'error' ? 'bg-red-500' : 'bg-green-600';
+  return (
+    <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] ${bg} text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 animate-bounce-in`}>
+      {type === 'error' ? <AlertTriangle size={18}/> : <CheckCircle size={18}/>}
+      <span className="font-medium text-sm">{message}</span>
+      <button onClick={onClose} className="ml-2 hover:bg-white/20 rounded-full p-1"><X size={14}/></button>
+    </div>
+  );
+};
+
 const DCLogo = ({ size = 48, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={`rounded-lg shadow-sm flex-shrink-0 ${className}`}>
     <rect width="100" height="100" rx="20" fill="#2563EB"/>
@@ -92,7 +121,7 @@ const translations = {
     loginTitle: "Dobrodošli", loginBtn: "Prijavi se", registerBtn: "Registracija",
     emailLabel: "Email adresa", passLabel: "Lozinka",
     logout: "Odjava",
-    save: "Spremi", delete: "Obriši", downloadPdf: "PDF", downloadDoc: "Word",
+    save: "Spremi", delete: "Obriši", confirmDelete: "Potvrdi brisanje?", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Pokreni Navigaciju", addToCalendar: "Dodaj u Kalendar",
     tasksTitle: "Pripreme / To-do",
     teamStatusTitle: "Status Zaposlenika", assignTo: "Dodijeljeno: ", teamMapTitle: "Lokacije Tima",
@@ -105,7 +134,12 @@ const translations = {
     gasTitle: "Gorivo", gasDesc: "Cijene u blizini", gasButton: "Traži benzinske (GPS)",
     foodTitle: "Hrana", foodSubtitle: "Preporuka rute",
     moveToPending: "Započni", moveToReview: "Na Pregled", moveToDone: "Završi", restore: "Vrati", moveToIncoming: "Vrati u nove",
-    moveToArchived: "Arhiviraj", restoreFromArchive: "Vrati u završeno"
+    moveToArchived: "Arhiviraj", restoreFromArchive: "Vrati u završeno",
+    newAppointment: "Novi Zadatak", labelCustomer: "Klijent", labelDate: "Datum", labelTime: "Vrijeme", labelCity: "Grad", labelAddress: "Adresa", labelRequest: "Zahtjev", labelAssign: "Dodijeli", labelCategory: "Kategorija",
+    searchPlaceholder: "Pretraži klijente, gradove...", emptyArchive: "Arhiva je prazna", taskPlaceholder: "Novi zadatak...",
+    reportTitle: "Izvještaj & Slike", demoSuccess: "Demo podaci generirani!",
+    teamInit: "Tim je inicijaliziran",
+    addEmployee: "Dodaj Zaposlenika", newEmployee: "Novi Zaposlenik", nameLabel: "Ime", roleLabel: "Uloga", cancel: "Odustani"
   },
   en: {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant",
@@ -114,7 +148,7 @@ const translations = {
     loginTitle: "Welcome Back", loginBtn: "Sign In", registerBtn: "Create Account",
     emailLabel: "Email Address", passLabel: "Password",
     logout: "Sign Out",
-    save: "Save", delete: "Delete", downloadPdf: "PDF", downloadDoc: "Word",
+    save: "Save", delete: "Delete", confirmDelete: "Confirm Delete?", downloadPdf: "PDF", downloadDoc: "Word",
     navStart: "Start Navigation", addToCalendar: "Add to Calendar",
     tasksTitle: "Preparation / To-do before taking over",
     teamStatusTitle: "Employee Status", assignTo: "Assigned to: ", teamMapTitle: "Team Locations",
@@ -127,7 +161,12 @@ const translations = {
     gasTitle: "Fuel", gasDesc: "Prices nearby", gasButton: "Search Gas Stations (GPS)",
     foodTitle: "Food", foodSubtitle: "Route recommendation",
     moveToPending: "Start Working", moveToReview: "Submit for Review", moveToDone: "Complete", restore: "Restore", moveToIncoming: "Move to Incoming",
-    moveToArchived: "Archive", restoreFromArchive: "Restore to Done"
+    moveToArchived: "Archive", restoreFromArchive: "Restore to Done",
+    newAppointment: "New Appointment", labelCustomer: "Customer", labelDate: "Date", labelTime: "Time", labelCity: "City", labelAddress: "Address", labelRequest: "Request", labelAssign: "Assign To", labelCategory: "Category",
+    searchPlaceholder: "Search customers, cities...", emptyArchive: "Archive is empty", taskPlaceholder: "Add task...",
+    reportTitle: "Report & Images", demoSuccess: "Demo data generated successfully!",
+    teamInit: "Team database initialized",
+    addEmployee: "Add Employee", newEmployee: "New Employee", nameLabel: "Name", roleLabel: "Role", cancel: "Cancel"
   }
 };
 
@@ -153,7 +192,8 @@ const Button = ({children, onClick, variant='primary', className='', icon:Icon, 
 const Input = ({label, type="text", ...p}) => (<div className="mb-3"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label><input type={type} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" {...p}/></div>);
 const Select = ({ label, options, ...props }) => ( <div className="mb-4"> <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label> <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-900" {...props}> {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)} </select> </div> );
 
-const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange, isMobile }) => {
+// Updated KanbanColumn to accept teamMembers as a prop
+const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange, isMobile, teamMembers }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const handleDragOver = (e) => { e.preventDefault(); setIsDragOver(true); };
   const handleDragLeave = (e) => { e.preventDefault(); setIsDragOver(false); };
@@ -175,7 +215,8 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
       </div>
       <div className="p-3 overflow-y-auto flex-1 space-y-3 custom-scrollbar">
         {appointments.length===0 ? <div className="text-center py-10 text-slate-300 italic text-xs">{isDragOver?'Drop here':'Empty'}</div> : appointments.map(app => {
-            const assignee = TEAM_MEMBERS.find(m => m.id === app.assignedTo) || TEAM_MEMBERS[0];
+            // Find assignee in the real data or fallback to the first one
+            const assignee = teamMembers.find(m => m.id === app.assignedTo) || teamMembers[0] || { name: '?', avatar: '' };
             return (
             <div key={app.id} draggable onDragStart={(e)=>{e.dataTransfer.setData("appId",app.id);e.dataTransfer.effectAllowed="move";}} onClick={()=>onClickApp(app)} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98] group relative">
               <div className="flex justify-between items-start mb-2">
@@ -198,9 +239,9 @@ export default function App() {
   const [authMode, setAuthMode] = useState('login'); 
   const [authData, setAuthData] = useState({ email: '', password: '' });
   const [authError, setAuthError] = useState('');
-  const [authErrorCode, setAuthErrorCode] = useState('');
   
   const [appointments, setAppointments] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]); // NEW: State for real Team Data
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [view, setView] = useState('login'); 
@@ -211,12 +252,53 @@ export default function App() {
   const t = translations[lang];
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [foodData, setFoodData] = useState([]);
-  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [], assignedTo: 'me' });
   const [showSplash, setShowSplash] = useState(true);
   const [dailyQuote, setDailyQuote] = useState("");
+  const [notification, setNotification] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+
+  // New states for adding/deleting employee
+  const [isAddingEmployee, setIsAddingEmployee] = useState(false);
+  const [newEmployeeData, setNewEmployeeData] = useState({ name: '', role: '', email: '' });
+  const [deleteEmployeeId, setDeleteEmployeeId] = useState(null); // Fix for delete confirmation
 
   useEffect(() => { setDailyQuote(getRandomQuote()); const handleResize = () => setIsMobile(window.innerWidth <768); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, []);
+
+  // Show notification helper
+  const showNotification = (msg, type='success') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  // -------------------------------------------------------------
+  // STEP 1 IMPLEMENTATION: Fetch Team from Firestore
+  // -------------------------------------------------------------
+  useEffect(() => {
+      if (!db) return;
+      // Using a PUBLIC collection so all authenticated users can see the team list
+      // Path: /artifacts/{appId}/public/data/team_members
+      const teamColRef = collection(db, 'artifacts', appId, 'public', 'data', 'team_members');
+
+      const unsubscribe = onSnapshot(teamColRef, async (snap) => {
+          if (snap.empty) {
+              // INITIALIZATION: If DB is empty, seed it with mock data
+              // This ensures the app is runnable immediately without manual DB entry
+              console.log("Team DB empty, initializing...");
+              const batch = writeBatch(db);
+              INITIAL_TEAM_MEMBERS.forEach(member => {
+                  const docRef = doc(teamColRef, member.id); // Use member.id as doc ID
+                  batch.set(docRef, member);
+              });
+              await batch.commit();
+              showNotification(t.teamInit);
+          } else {
+              const members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+              setTeamMembers(members);
+          }
+      });
+      return () => unsubscribe();
+  }, []);
 
   // Updated Init & Auth Effect
   useEffect(() => {
@@ -225,16 +307,22 @@ export default function App() {
         if (!app) throw new Error("Firebase not initialized");
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
            await signInWithCustomToken(auth, __initial_auth_token);
-        } 
-      } catch (err) { console.warn("Auto-login skipped:", err); }
+        } else {
+           await signInAnonymously(auth);
+        }
+      } catch (err) { console.warn("Auth flow check:", err); }
     };
     initAuth();
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
-        const userProfileRef = doc(db, 'artifacts', appId, 'users', u.uid, 'account', 'profile');
-        const snap = await getDoc(userProfileRef);
-        if (snap.exists()) { setRole(snap.data().role); } else { setRole('admin'); }
+        try {
+            const userProfileRef = doc(db, 'artifacts', appId, 'users', u.uid, 'account', 'profile');
+            const snap = await getDoc(userProfileRef);
+            if (snap.exists()) { setRole(snap.data().role); } else { setRole('admin'); }
+        } catch (e) {
+            setRole('admin'); 
+        }
         setUser(u);
         setView('dashboard');
       } else {
@@ -257,9 +345,6 @@ export default function App() {
       setLoading(false);
     }, (err) => { 
         console.error("Firestore Error:", err); 
-        if (err.code === 'permission-denied') {
-            setErrorMsg("Permission denied. Check Firestore Security Rules.");
-        }
     });
     return () => unsubscribe();
   }, [user]);
@@ -267,7 +352,6 @@ export default function App() {
   const handleAuth = async () => {
     setLoading(true);
     setAuthError('');
-    setAuthErrorCode('');
     try {
         if (authMode === 'login') {
             await signInWithEmailAndPassword(auth, authData.email, authData.password);
@@ -283,7 +367,6 @@ export default function App() {
     } catch (e) {
         console.error(e);
         let msg = t.authError;
-        setAuthErrorCode(e.code);
         if (e.code === 'auth/operation-not-allowed') msg = lang === 'en' ? "Enable Email/Pass in Firebase!" : "Aktivirajte Email/Pass u Firebaseu!";
         else if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') msg = lang === 'en' ? "Invalid email or password." : "Nevažeći email ili lozinka.";
         else if (e.code === 'auth/email-already-in-use') msg = lang === 'en' ? "Email already in use." : "Email se već koristi.";
@@ -317,9 +400,67 @@ export default function App() {
         todos: [ { text: t.defaultTask1, done: false }, { text: t.defaultTask2, done: false }, { text: t.defaultTask3, done: false }, { text: t.defaultTask4, done: false } ]
     });
     setView('dashboard');
+    showNotification("Saved successfully");
   };
+
   const updateApp = async (id, data) => { if(!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id), data); };
-  const deleteApp = async (id) => { if(!user) return; if(confirm(t.confirmDelete)) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id)); setView('dashboard'); }};
+  
+  const deleteApp = async (id) => { 
+      if(!user) return; 
+      if (deleteConfirmId === id) {
+          await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id)); 
+          setView('dashboard');
+          setDeleteConfirmId(null);
+          showNotification("Deleted");
+      } else {
+          setDeleteConfirmId(id);
+          setTimeout(() => setDeleteConfirmId(null), 3000);
+      }
+  };
+
+  // --- NEW: Add Employee Function ---
+  const addEmployee = async () => {
+      if(!newEmployeeData.name || !newEmployeeData.email) return;
+      // Generate ID from email prefix + random suffix to ensure uniqueness but keep it readable
+      const safeId = newEmployeeData.email.split('@')[0].replace(/[^a-z0-9]/gi, '') + '_' + Math.floor(Math.random() * 1000);
+      
+      try {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'team_members', safeId), {
+            id: safeId,
+            name: newEmployeeData.name,
+            role: newEmployeeData.role || 'Staff',
+            email: newEmployeeData.email,
+            // Generate avatar based on name
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(newEmployeeData.name)}`
+          });
+          setIsAddingEmployee(false);
+          setNewEmployeeData({ name: '', role: '', email: '' });
+          showNotification(lang === 'hr' ? "Zaposlenik dodan!" : "Employee added!");
+      } catch (err) {
+          console.error("Error adding employee:", err);
+          showNotification("Error adding employee", "error");
+      }
+  };
+
+  // --- FIXED: Delete Employee Function (No window.confirm) ---
+  const handleDeleteEmployee = async (empId) => {
+      if (deleteEmployeeId === empId) {
+          // Confirmed
+          try {
+              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'team_members', empId));
+              showNotification(lang === 'hr' ? "Zaposlenik obrisan" : "Employee removed");
+              setDeleteEmployeeId(null);
+          } catch(err) {
+              console.error(err);
+              showNotification("Error deleting", "error");
+          }
+      } else {
+          // First click - ask for confirmation
+          setDeleteEmployeeId(empId);
+          setTimeout(() => setDeleteEmployeeId(null), 3000);
+      }
+  };
+
   const handleUpdateStatus = (id, s) => { updateApp(id, {status: s}); if(selectedAppointment && selectedAppointment.id === id) setSelectedAppointment({...selectedAppointment, status: s}); };
   const getCategoryLabel = (k) => { const m = { 'inspection': t.catInspection, 'consulting': t.catConsulting, 'emergency': t.catEmergency }; return m[k] || k; };
   const triggerStationNav = (name, city) => { safeOpen(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${city}`)}`); };
@@ -332,7 +473,6 @@ export default function App() {
   const archived = appointments.filter(a => a.status === 'archived' && filterFn(a));
   useEffect(() => { if (selectedAppointment && view === 'detail') { setFoodData(generateRouteRestaurants(selectedAppointment.city, lang)); } }, [selectedAppointment, view, lang]);
 
-  // NEW FUNCTION: Generate Demo Data
   const generateDemoData = async () => {
     if (!user) return;
     setLoading(true);
@@ -352,7 +492,8 @@ export default function App() {
     try {
         const batchPromises = demoCustomers.map(async (c, i) => {
             const randomStatus = statuses[i];
-            const randomMember = TEAM_MEMBERS[i % TEAM_MEMBERS.length].id;
+            // Use real team members from DB for assignment, fallback to 'me' if empty
+            const randomMember = teamMembers.length > 0 ? teamMembers[i % teamMembers.length].id : 'me';
             const date = new Date();
             date.setDate(date.getDate() + (i - 2)); 
             const dateStr = date.toISOString().split('T')[0];
@@ -364,7 +505,7 @@ export default function App() {
             });
         });
         await Promise.all(batchPromises);
-        alert("10 Demo-Aufträge wurden erstellt!");
+        showNotification(t.demoSuccess);
     } catch (e) { console.error("Error generating demo data:", e); }
     setLoading(false);
   };
@@ -379,11 +520,10 @@ export default function App() {
               </div>
           )}
           
-          {/* MOBILE: Back Button within Sidebar */}
           {isMobile && (
             <div className="bg-slate-800 p-2 flex items-center gap-2 border-b border-slate-700">
-                 <button onClick={() => setView('dashboard')} className="p-1 rounded bg-slate-700 hover:bg-slate-600"><ArrowLeft size={16}/></button>
-                 <span className="text-xs font-bold text-slate-300">BACK TO BOARD</span>
+                  <button onClick={() => setView('dashboard')} className="p-1 rounded bg-slate-700 hover:bg-slate-600"><ArrowLeft size={16}/></button>
+                  <span className="text-xs font-bold text-slate-300">BACK TO BOARD</span>
             </div>
           )}
           
@@ -405,7 +545,48 @@ export default function App() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{MOCK_TEMPLATES.map(tpl => (<Card key={tpl.id} className="p-4 hover:border-blue-300 cursor-pointer group"><div className="flex justify-between mb-2"><FileText className="text-blue-500" size={24}/><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button className="p-1 hover:bg-slate-100 rounded"><Copy size={14}/></button><button className="p-1 hover:bg-slate-100 rounded"><Settings size={14}/></button></div></div><h3 className="font-bold text-slate-800">{tpl.name}</h3><div className="text-xs text-slate-500 mt-2 flex justify-between"><span>{tpl.author}</span><span>{tpl.created}</span></div></Card>))}</div>
               </div>);
           case 'employees': return (
-              <div className="p-6 space-y-6"><h2 className="text-2xl font-bold text-slate-800">Team & Employees</h2><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{TEAM_MEMBERS.map(member => (<Card key={member.id} className="p-4 flex items-center gap-4"><img src={member.avatar} className="w-16 h-16 rounded-full border-2 border-slate-100"/><div className="flex-1"><h4 className="font-bold text-slate-800">{member.name}</h4><p className="text-xs text-slate-500">{member.role}</p><p className="text-xs text-blue-600 mt-1">{member.email}</p></div><button className="p-2 hover:bg-slate-50 rounded-full"><Settings size={16} className="text-slate-400"/></button></Card>))}</div></div>);
+              <div className="p-6 space-y-6">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-slate-800">{t.menuEmployees}</h2>
+                    <Button size="small" icon={Plus} onClick={() => setIsAddingEmployee(true)}>{t.addEmployee}</Button>
+                </div>
+                
+                {/* ADD EMPLOYEE FORM */}
+                {isAddingEmployee && (
+                    <Card className="p-4 bg-blue-50 border-blue-200 mb-6 animate-fade-in">
+                        <h3 className="font-bold text-slate-700 mb-3">{t.newEmployee}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                            <Input label={t.nameLabel} value={newEmployeeData.name} onChange={e => setNewEmployeeData({...newEmployeeData, name: e.target.value})} placeholder="Max Mustermann" />
+                            <Input label={t.roleLabel} value={newEmployeeData.role} onChange={e => setNewEmployeeData({...newEmployeeData, role: e.target.value})} placeholder="Inspector" />
+                            <Input label={t.emailLabel} value={newEmployeeData.email} onChange={e => setNewEmployeeData({...newEmployeeData, email: e.target.value})} placeholder="max@firma.com" />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="secondary" onClick={() => setIsAddingEmployee(false)}>{t.cancel}</Button>
+                            <Button onClick={addEmployee} icon={Save}>{t.save}</Button>
+                        </div>
+                    </Card>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {teamMembers.map(member => (
+                        <Card key={member.id} className="p-4 flex items-center gap-4 group relative">
+                            <img src={member.avatar} className="w-16 h-16 rounded-full border-2 border-slate-100 bg-white" />
+                            <div className="flex-1">
+                                <h4 className="font-bold text-slate-800">{member.name}</h4>
+                                <p className="text-xs text-slate-500">{member.role}</p>
+                                <p className="text-xs text-blue-600 mt-1">{member.email}</p>
+                            </div>
+                            <button 
+                                onClick={() => handleDeleteEmployee(member.id)} 
+                                className={`p-2 rounded-full transition-all absolute top-2 right-2 ${deleteEmployeeId === member.id ? 'bg-red-600 text-white opacity-100' : 'text-red-400 hover:bg-red-50 hover:text-red-600 opacity-0 group-hover:opacity-100'}`}
+                                title="Remove"
+                            >
+                                {deleteEmployeeId === member.id ? <Check size={16} /> : <Trash2 size={16} />}
+                            </button>
+                        </Card>
+                    ))}
+                </div>
+              </div>);
           case 'customers': return (
               <div className="p-6 space-y-6"><h2 className="text-2xl font-bold text-slate-800">Customers (CRM)</h2><Card className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200"><tr><th className="p-4">Customer</th><th className="p-4">Status</th><th className="p-4">Report</th><th className="p-4">Plan</th><th className="p-4 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{appointments.map(app => (<tr key={app.id} className="hover:bg-slate-50"><td className="p-4 font-bold text-slate-800">{app.customerName}<br/><span className="text-xs font-normal text-slate-500">{app.city}</span></td><td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${app.status === 'done' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{app.status || 'Active'}</span></td><td className="p-4 text-slate-500">{app.finalReport ? <CheckCircle size={16} className="text-green-500"/> : '-'}</td><td className="p-4"><span className="text-xs bg-slate-100 px-2 py-1 rounded">Standard</span></td><td className="p-4 text-right"><button className="text-blue-600 hover:underline">View</button></td></tr>))}</tbody></table></div></Card></div>);
           case 'calendar': return (<div className="p-6 h-full flex flex-col"><h2 className="text-2xl font-bold text-slate-800 mb-6">Master Calendar</h2><div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 bg-[url('https://www.transparenttextures.com/patterns/graphy.png')]"><div className="text-center"><Calendar size={48} className="mx-auto mb-4 opacity-50"/><p>Google Calendar Integration Active</p><Button className="mt-4" variant="secondary" icon={ExternalLink} onClick={() => safeOpen("https://calendar.google.com")}>Open Google Calendar</Button></div></div></div>);
@@ -418,7 +599,10 @@ export default function App() {
                 </div>
                 </Card></div>);
           case 'map': default: return (
-                <div className="p-6 space-y-6"><h2 className="text-2xl font-bold text-slate-800">Live Operations</h2><Card className="p-0 overflow-hidden relative h-96 bg-blue-50 border-blue-100 shadow-md"><div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(#2563EB 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><MapIcon size={64} className="text-blue-200" /></div>{appointments.filter(a => a.status === 'pending').map((p, i) => { const assignee = TEAM_MEMBERS.find(m => m.id === p.assignedTo) || TEAM_MEMBERS[0]; return (<div key={p.id} className="absolute bg-white p-2 rounded-xl shadow-lg border border-slate-200 flex items-center gap-2 animate-bounce" style={{ top: `${20 + (i*15)}%`, left: `${20 + (i*20)}%` }}><img src={assignee.avatar} className="w-8 h-8 rounded-full border border-white shadow-sm"/><div><div className="text-xs font-bold text-slate-800 whitespace-nowrap">{assignee.name}</div><div className="text-[10px] text-slate-500 font-mono">{p.city}</div></div></div>) })}</Card></div>);
+                <div className="p-6 space-y-6"><h2 className="text-2xl font-bold text-slate-800">Live Operations</h2><Card className="p-0 overflow-hidden relative h-96 bg-blue-50 border-blue-100 shadow-md"><div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(#2563EB 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><MapIcon size={64} className="text-blue-200" /></div>{appointments.filter(a => a.status === 'pending').map((p, i) => { 
+                    // Use real team data here
+                    const assignee = teamMembers.find(m => m.id === p.assignedTo) || teamMembers[0] || { name: '?', avatar: '' };
+                    return (<div key={p.id} className="absolute bg-white p-2 rounded-xl shadow-lg border border-slate-200 flex items-center gap-2 animate-bounce" style={{ top: `${20 + (i*15)}%`, left: `${20 + (i*20)}%` }}><img src={assignee.avatar} className="w-8 h-8 rounded-full border border-white shadow-sm"/><div><div className="text-xs font-bold text-slate-800 whitespace-nowrap">{assignee.name}</div><div className="text-[10px] text-slate-500 font-mono">{p.city}</div></div></div>) })}</Card></div>);
       }
   };
 
@@ -461,6 +645,7 @@ export default function App() {
               <div className={`flex-1 overflow-y-auto ${isMobile ? 'pb-24' : ''}`}>
                   {renderAdminContent()}
               </div>
+              <Toast message={notification?.msg} type={notification?.type} onClose={() => setNotification(null)} />
           </div>
       );
   }
@@ -488,7 +673,8 @@ export default function App() {
                 <div className="mb-4">
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.labelAssign}</label>
                     <div className="flex gap-2 overflow-x-auto pb-2">
-                        {TEAM_MEMBERS.map(m => (
+                        {/* Using Real Team Members from DB */}
+                        {teamMembers.map(m => (
                             <button key={m.id} onClick={() => setFormData({...formData, assignedTo: m.id})} className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${formData.assignedTo === m.id ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}>
                                 <img src={m.avatar} className="w-5 h-5 rounded-full"/>
                                 <span className="text-xs font-bold whitespace-nowrap">{m.name}</span>
@@ -511,7 +697,9 @@ export default function App() {
     const handleReportUpdate = (noteText) => { const finalText = generateReportText(noteText, a.customerName, a.date, a.category, lang); updateApp(a.id, { reportNotes: noteText, finalReport: finalText }); setSelectedAppointment({ ...a, reportNotes: noteText, finalReport: finalText }); };
     const statusColor = a.status==='archived' ? 'bg-slate-500' : a.status==='done' ? 'bg-green-600' : a.status==='pending' ? 'bg-orange-500' : 'bg-blue-600';
     const statusLabel = a.status === 'incoming' ? t.colIncoming : a.status === 'pending' ? t.colPending : a.status === 'done' ? t.colDone : t.colArchived;
-    const assignee = TEAM_MEMBERS.find(m => m.id === a.assignedTo) || TEAM_MEMBERS[0];
+    
+    // Find Assignee from Real Data
+    const assignee = teamMembers.find(m => m.id === a.assignedTo) || teamMembers[0] || { name: 'Unknown', avatar: '' };
 
     return (
       <div className="min-h-screen bg-slate-50 pb-24 font-sans text-slate-900">
@@ -527,7 +715,8 @@ export default function App() {
            {role === 'admin' && (
                <div className="flex items-center justify-between bg-white/90 backdrop-blur p-2 rounded-lg shadow-sm border border-white/50 text-xs font-medium text-slate-600"><span>{t.assignTo}</span><div className="flex items-center gap-2"><img src={assignee.avatar} className="w-5 h-5 rounded-full"/><span>{assignee.name}</span></div>
                     <div className="flex gap-2 overflow-x-auto pb-1 pt-1 border-t border-slate-200">
-                        {TEAM_MEMBERS.map(m => (
+                        {/* Using Real Team Members from DB */}
+                        {teamMembers.map(m => (
                             <button key={m.id} onClick={() => { updateApp(a.id, { assignedTo: m.id }); setSelectedAppointment({...a, assignedTo: m.id}); }} className={`flex-shrink-0 w-8 h-8 rounded-full border-2 ${a.assignedTo === m.id ? 'border-blue-500' : 'border-transparent opacity-50'}`}>
                                 <img src={m.avatar} className="w-full h-full rounded-full" title={m.name} />
                             </button>
@@ -562,7 +751,11 @@ export default function App() {
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => triggerStationNav(f.name, a.city)}><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card></div>
            
            <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><FileText size={16}/> {t.reportTitle}</h3><div className="flex gap-2 overflow-x-auto pb-4 mb-2"><label className="flex-shrink-0 w-16 h-16 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-50"><Camera size={20}/><input type="file" className="hidden" accept="image/*" onChange={async (e) => { if(e.target.files[0]) { const b64 = await compressImage(e.target.files[0]); const n=[...(a.reportImages||[]), b64]; updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }}}/></label>{(a.reportImages||[]).map((img, i) => (<div key={i} className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200"><img src={img} className="w-full h-full object-cover"/><button onClick={() => { const n = a.reportImages.filter((_, idx) => idx !== i); updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5"><X size={10}/></button></div>))}</div><div className="space-y-2"><textarea className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm min-h-[100px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={t.reportNotesPlaceholder} value={a.reportNotes || ''} onChange={(e) => { setSelectedAppointment({...a, reportNotes: e.target.value}); }} /><Button fullWidth onClick={() => handleReportUpdate(a.reportNotes || '')} icon={Wand2}>{t.generateBtn}</Button></div>{a.finalReport && (<div className="mt-4 pt-4 border-t border-slate-100"><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.reportResultLabel}</label><div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono whitespace-pre-wrap mb-4 max-h-40 overflow-y-auto">{a.finalReport}</div><div className="flex gap-2"><Button size="small" variant="secondary" icon={Printer} onClick={() => printAsPdf(a.finalReport, a.reportImages)}>{t.downloadPdf}</Button><Button size="small" variant="secondary" icon={Download} onClick={() => downloadAsWord(a.finalReport, a.customerName, a.reportImages)}>{t.downloadDoc}</Button></div></div>)}</Card>
-           <div className="pt-8 pb-4"><Button fullWidth variant="danger" icon={Trash2} onClick={() => deleteApp(a.id)}>{t.delete}</Button></div>
+           <div className="pt-8 pb-4">
+               <Button fullWidth variant="danger" icon={Trash2} onClick={() => deleteApp(a.id)}>
+                   {deleteConfirmId === a.id ? t.confirmDelete : t.delete}
+               </Button>
+            </div>
         </div>
       </div>
     );
@@ -581,7 +774,7 @@ export default function App() {
             {role === 'admin' && (
                 <button onClick={() => setView('team')} className={`p-2 rounded-lg ${view==='team'?'bg-blue-50 text-blue-600':'text-slate-400'}`} title={t.navTeam}><Users size={20}/></button>
             )}
-            <button onClick={() => setView('archive')} className={`p-2 rounded-lg ${view==='archive'?'bg-blue-50 text-blue-600':'text-slate-400'}`}><Archive size={20}/></button>
+            {/* REMOVED ARCHIVE BUTTON AS REQUESTED */}
             <button onClick={() => setLang(l => l==='hr'?'en':'hr')} className="px-2 bg-slate-100 rounded text-xs font-bold text-slate-500 border border-slate-200">{lang.toUpperCase()}</button>
             <button onClick={handleLogout} className="px-2 bg-red-50 rounded text-xs font-bold text-red-500 border border-red-200"><LogOut size={16}/></button>
             {/* DEBUG TOGGLE FOR ROLE (Hidden in production usually) */}
@@ -599,19 +792,21 @@ export default function App() {
               {/* DESKTOP VIEW: Edge to Edge Columns */}
               {!isMobile && (
                   <div className="flex flex-row h-full w-full divide-x divide-slate-200">
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} /></div>
+                      {/* Pass teamMembers Prop */}
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} /></div>
                   </div>
               )}
               {/* MOBILE VIEW: Stacked with Padding */}
               {isMobile && (
                   <div className="flex flex-col gap-4 p-4 overflow-y-auto h-full custom-scrollbar">
-                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} />
-                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} />
-                      <KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} />
-                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} />
+                      {/* Pass teamMembers Prop */}
+                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} />
+                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} />
+                      <KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} />
+                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} />
                   </div>
               )}
             </>
@@ -624,6 +819,7 @@ export default function App() {
               <button onClick={() => { setFormData({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [], assignedTo: 'me' }); setView('add'); }} className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl shadow-blue-200 flex items-center justify-center transition-transform active:scale-90"><Plus size={28} /></button>
           )}
       </div>
+      <Toast message={notification?.msg} type={notification?.type} onClose={() => setNotification(null)} />
       <style>{`.custom-scrollbar::-webkit-scrollbar{height:4px;width:4px}.custom-scrollbar::-webkit-scrollbar-track{background:transparent}.custom-scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}`}</style>
     </div>
   );
