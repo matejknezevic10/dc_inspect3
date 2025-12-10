@@ -8,7 +8,7 @@ import {
   Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, 
   UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, 
   Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database, Info,
-  ChevronLeft, ChevronRight, FilePlus, UserX
+  ChevronLeft, ChevronRight, FilePlus, UserX, KeyRound
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { 
@@ -18,7 +18,8 @@ import {
   onAuthStateChanged, 
   signOut,
   signInAnonymously,
-  signInWithCustomToken
+  signInWithCustomToken,
+  sendPasswordResetEmail
 } from "firebase/auth";
 import { 
   getFirestore, 
@@ -47,7 +48,8 @@ import {
         appId: "1:639013498118:web:15146029fbc159cbd30287",
         measurementId: "G-5TETMHQ1EW"
   };
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  
+  const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 let app, auth, db;
 try {
@@ -72,10 +74,10 @@ const INITIAL_TEAM_MEMBERS = [
 ];
 
 const INITIAL_TEMPLATES = [
-    { id: 't1', name: "Standard Hausinspektion", content: "Die Immobilie wurde in einem allgemein guten Zustand vorgefunden. Folgende Mängel wurden festgestellt:\n- ...\n- ...\nEmpfohlene Maßnahmen:\n- ...", created: "2024-01-10", author: "Ich (Admin)" },
-    { id: 't2', name: "Wasserschaden Analyse", content: "Untersuchung auf Feuchtigkeitsschäden.\nMesswerte:\n- Wandfeuchte: ...%\n- Bodenfeuchte: ...%\nUrsache vermutlich: ...", created: "2024-02-15", author: "Anna Müller" },
-    { id: 't3', name: "Dach & Fassade", content: "Sichtprüfung der Dacheindeckung und Fassade.\nZustand Dachrinne: OK/Mangelhaft\nZiegel: Vollständig\nRisse in Fassade: Keine sichtbar.", created: "2024-03-01", author: "Ich (Admin)" },
-    { id: 't4', name: "Elektro-Check (VDE)", content: "Prüfung der elektrischen Anlagen nach VDE.\nSicherungskasten: ...\nFI-Schalter Test: Erfolgreich\nOffene Leitungen: Keine.", created: "2024-03-20", author: "Tom B." }
+    { id: 't1', name: "Standard Home Inspection", content: "Property found in generally good condition. The following defects were noted:\n- ...\n- ...\nRecommended actions:\n- ...", created: "2024-01-10", author: "Admin" },
+    { id: 't2', name: "Water Damage Analysis", content: "Investigation for moisture damage.\nReadings:\n- Wall moisture: ...%\n- Floor moisture: ...%\nProbable cause: ...", created: "2024-02-15", author: "Anna Müller" },
+    { id: 't3', name: "Roof & Facade", content: "Visual inspection of roofing and facade.\nGutter condition: OK/Defective\nTiles: Complete\nFacade cracks: None visible.", created: "2024-03-01", author: "Admin" },
+    { id: 't4', name: "Electrical Check (VDE)", content: "Inspection of electrical systems.\nFuse box: ...\nRCD Test: Successful\nExposed wires: None.", created: "2024-03-20", author: "Tom B." }
 ];
 
 const getRandomQuote = () => {
@@ -116,40 +118,8 @@ const AppLogo = ({ size = "w-14 h-14", showFallback = true }) => {
   return <img src="/logo.jpg" alt="DC Logo" className={`${size} rounded-xl object-cover shadow-sm bg-white`} onError={() => setImgError(true)} />;
 };
 
-const translations = {
-  hr: {
-    appTitle: "DC INSPECT", subtitle: "Mobilni Asistent",
-    navDashboard: "Dashboard", navArchive: "Arhiv", navTeam: "Tim / Mapa",
-    colIncoming: "NOVI", colPending: "U TIJEKU", colReview: "PREGLED", colDone: "ZAVRŠENO", colArchived: "ARHIVIRANO",
-    loginTitle: "Dobrodošli", loginBtn: "Prijavi se", registerBtn: "Registracija",
-    emailLabel: "Email adresa", passLabel: "Lozinka",
-    logout: "Odjava",
-    save: "Spremi", delete: "Obriši", confirmDelete: "Potvrdi brisanje?", downloadPdf: "PDF", downloadDoc: "Word",
-    navStart: "Pokreni Navigaciju", addToCalendar: "Dodaj u Kalendar",
-    tasksTitle: "Pripreme / To-do",
-    teamStatusTitle: "Status Zaposlenika", assignTo: "Dodijeljeno: ", teamMapTitle: "Lokacije Tima",
-    catInspection: "Inspekcija", catConsulting: "Savjetovanje", catEmergency: "Hitno",
-    reportNotesPlaceholder: "Unesite natuknice...", generateBtn: "Kreiraj Izvještaj", reportResultLabel: "Pregled Izvještaja",
-    defaultTask1: "Pripremi alat", defaultTask2: "Pregledaj dokumentaciju", defaultTask3: "Ključeve", defaultTask4: "Zaštitna oprema",
-    authError: "Greška pri prijavi.", demoBtn: "Probleme? Pokreni Demo (Anonimno)",
-    menuOverview: "Pregled / Mapa", menuTemplates: "Predlošci", menuEmployees: "Zaposlenici", menuCustomers: "Kupci", menuCalendar: "Kalendar", menuSetup: "Postavke",
-    genDataBtn: "Generiraj testne podatke",
-    gasTitle: "Gorivo", gasDesc: "Cijene u blizini", gasButton: "Traži benzinske (GPS)",
-    foodTitle: "Hrana", foodSubtitle: "Preporuka rute",
-    moveToPending: "Započni", moveToReview: "Na Pregled", moveToDone: "Završi", restore: "Vrati", moveToIncoming: "Vrati u nove",
-    moveToArchived: "Arhiviraj", restoreFromArchive: "Vrati u završeno",
-    newAppointment: "Novi Zadatak", labelCustomer: "Klijent", labelDate: "Datum", labelTime: "Vrijeme", labelCity: "Grad", labelAddress: "Adresa", labelRequest: "Zahtjev", labelAssign: "Dodijeli", labelCategory: "Kategorija",
-    searchPlaceholder: "Pretraži klijente, gradove...", emptyArchive: "Arhiva je prazna", taskPlaceholder: "Novi zadatak...",
-    reportTitle: "Izvještaj & Slike", demoSuccess: "Demo podaci generirani!",
-    teamInit: "Tim je inicijaliziran",
-    addEmployee: "Dodaj Zaposlenika", newEmployee: "Novi Zaposlenik", nameLabel: "Ime", roleLabel: "Uloga", cancel: "Odustani",
-    autoSyncLabel: "Otvori Google Kalendar",
-    months: ["Siječanj", "Veljača", "Ožujak", "Travanj", "Svibanj", "Lipanj", "Srpanj", "Kolovoz", "Rujan", "Listopad", "Studeni", "Prosinac"],
-    addTemplate: "Ubaci predložak", selectTemplate: "Odaberi predložak", createTemplate: "Novi predložak", import: "Uvoz", templateName: "Naziv predloška", templateContent: "Sadržaj",
-    guestMessage: "Vaš račun čeka odobrenje ili niste dodani u tim. Kontaktirajte administratora.",
-    guestTitle: "Pristup Ograničen"
-  },
-  en: {
+// Unified English Translations
+const TEXT = {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant",
     navDashboard: "Dashboard", navArchive: "Archive", navTeam: "Admin Panel",
     colIncoming: "INCOMING", colPending: "PENDING", colReview: "IN REVIEW", colDone: "DONE", colArchived: "ARCHIVED",
@@ -179,8 +149,8 @@ const translations = {
     months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
     addTemplate: "Insert Template", selectTemplate: "Select Template", createTemplate: "Create Template", import: "Import", templateName: "Template Name", templateContent: "Content",
     guestMessage: "Your account is pending approval or you have not been added to the team. Please contact your administrator.",
-    guestTitle: "Access Restricted"
-  }
+    guestTitle: "Access Restricted",
+    forgotPassword: "Forgot Password?", resetEmailSent: "Password reset email sent!", resetError: "Error sending reset email."
 };
 
 // ... Helpers ...
@@ -188,8 +158,8 @@ const safeOpen = (url) => { if(!url) return; const w = window.open(url, '_blank'
 const compressImage = (file) => new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const cvs = document.createElement('canvas'); const max = 1000; let w = img.width, h = img.height; if(w>h){if(w>max){h*=max/w;w=max;}}else{if(h>max){w*=max/h;h=max;}} cvs.width=w; cvs.height=h; const ctx = cvs.getContext('2d'); ctx.drawImage(img,0,0,w,h); resolve(cvs.toDataURL('image/jpeg', 0.6)); } } });
 const downloadAsWord = (c,f,i=[]) => { let h=`<html><body><div style="font-family:Arial;white-space:pre-wrap;">${c}</div>${i.map(u=>`<p><img src="${u}" width="400"/></p>`).join('')}</body></html>`; const b=new Blob(['\ufeff',h],{type:'application/msword'}); const u=URL.createObjectURL(b); const l=document.createElement('a'); l.href=u; l.download=`${f}.doc`; document.body.appendChild(l); l.click(); document.body.removeChild(l); };
 const printAsPdf = (c,i=[]) => { const w=window.open('','_blank'); if(w){w.document.write(`<html><head><style>body{font-family:Arial;padding:20px;white-space:pre-wrap}img{max-width:100%;max-height:300px;margin:10px}</style></head><body><div>${c}</div><div>${i.map(u=>`<img src="${u}"/>`).join('')}</div></body></html>`); w.document.close(); setTimeout(()=>w.print(),500);} };
-const generateReportText = (n,c,d,cat,l) => { const ds=new Date(d).toLocaleDateString(); return l==='hr' ? `IZVJEŠTAJ\nKlijent: ${c}\nDatum: ${ds}\nKategorija: ${cat}\n\nNALAZI:\n${n}` : `REPORT\nClient: ${c}\nDate: ${ds}\nCategory: ${cat}\n\nFINDINGS:\n${n}`; };
-const generateRouteRestaurants = (city, lang) => { return [ { name: "Highway Rest Stop A1", type: "Rest Stop", dist: "On Route" }, { name: `Grill House ${city}`, type: "Local Food", dist: "2 min detour" }, { name: "Coffee & Drive", type: "Snack", dist: "On Route" } ]; };
+const generateReportText = (n,c,d,cat) => { const ds=new Date(d).toLocaleDateString(); return `REPORT\nClient: ${c}\nDate: ${ds}\nCategory: ${cat}\n\nFINDINGS:\n${n}`; };
+const generateRouteRestaurants = (city) => { return [ { name: "Highway Rest Stop A1", type: "Rest Stop", dist: "On Route" }, { name: `Grill House ${city}`, type: "Local Food", dist: "2 min detour" }, { name: "Coffee & Drive", type: "Snack", dist: "On Route" } ]; };
 const generateTimeSlots = () => { const slots = []; for (let i = 6; i <= 22; i++) { for (let j = 0; j < 60; j += 15) { const hour = i.toString().padStart(2, '0'); const minute = j.toString().padStart(2, '0'); slots.push({ value: `${hour}:${minute}`, label: `${hour}:${minute}` }); } } return slots; };
 const timeOptions = generateTimeSlots();
 const openGoogleCalendar = (app) => { const startDate = new Date(`${app.date}T${app.time}`); const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); const formatDate = (date) => date.toISOString().replace(/-|:|\.\d+/g, ''); const details = encodeURIComponent(`Inspection: ${app.request}\nCategory: ${app.category}`); const location = encodeURIComponent(`${app.address}, ${app.city}`); const title = encodeURIComponent(`DC Inspect: ${app.customerName}`); safeOpen(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${details}&location=${location}`); };
@@ -206,7 +176,7 @@ const Input = ({label, type="text", ...p}) => (<div className="mb-3"><label clas
 const Select = ({ label, options, ...props }) => ( <div className="mb-4"> <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label> <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-900" {...props}> {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)} </select> </div> );
 
 // Updated KanbanColumn to accept teamMembers and ROLE
-const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusChange, isMobile, teamMembers, role }) => {
+const KanbanColumn = ({ title, status, appointments, onClickApp, onStatusChange, isMobile, teamMembers, role }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const handleDragOver = (e) => { e.preventDefault(); setIsDragOver(true); };
   const handleDragLeave = (e) => { e.preventDefault(); setIsDragOver(false); };
@@ -245,7 +215,7 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, lang, onStatusC
                   <h4 className="font-bold text-slate-800 text-sm">{app.customerName}</h4>
                   <img src={assignee.avatar} className="w-6 h-6 rounded-full border border-slate-200" alt={assignee.name} title={assignee.name} />
               </div>
-              <span className="text-[10px] font-medium bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded mb-2 inline-block">{new Date(app.date).toLocaleDateString(lang === 'hr' ? 'hr-HR' : 'en-US')}</span>
+              <span className="text-[10px] font-medium bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded mb-2 inline-block">{new Date(app.date).toLocaleDateString('en-US')}</span>
               <div className="flex items-center text-xs text-slate-500 gap-1 mb-2"><MapPin size={10}/> {app.city} <span className="mx-1">•</span> <span>{app.category}</span></div>
               <div className="bg-slate-50 px-2 py-1.5 rounded text-[11px] text-slate-600 truncate border border-slate-100">"{app.request}"</div>
             </div>
@@ -271,8 +241,7 @@ export default function App() {
   const [adminView, setAdminView] = useState('map'); 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [filter, setFilter] = useState('');
-  const [lang, setLang] = useState('en');
-  const t = translations[lang];
+  const t = TEXT;
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [foodData, setFoodData] = useState([]);
   const [formData, setFormData] = useState({ customerName: '', city: '', address: '', date: '', time: '08:00', request: '', category: 'inspection', status: 'incoming', reportNotes: '', finalReport: '', todos: [], reportImages: [], assignedTo: 'me', autoSync: false });
@@ -460,11 +429,25 @@ export default function App() {
     } catch (e) {
         console.error(e);
         let msg = t.authError;
-        if (e.code === 'auth/email-already-in-use') msg = lang === 'en' ? "Email already in use." : "Email se već koristi.";
-        else if (e.code === 'auth/weak-password') msg = lang === 'en' ? "Password too weak." : "Lozinka je preslaba.";
+        if (e.code === 'auth/email-already-in-use') msg = "Email already in use.";
+        else if (e.code === 'auth/weak-password') msg = "Password too weak.";
         setAuthError(msg);
         setLoading(false);
     }
+  };
+
+  const handlePasswordReset = async () => {
+      if (!authData.email) {
+          showNotification("Please enter your email first", "error");
+          return;
+      }
+      try {
+          await sendPasswordResetEmail(auth, authData.email);
+          showNotification(t.resetEmailSent);
+      } catch (e) {
+          console.error(e);
+          showNotification("Error: " + e.message, "error");
+      }
   };
 
   const handleDemoAuth = async () => {
@@ -536,7 +519,7 @@ export default function App() {
           });
           setIsAddingEmployee(false);
           setNewEmployeeData({ name: '', role: '', email: '' });
-          showNotification(lang === 'hr' ? "Zaposlenik dodan! Neka se registrira." : "Employee added! Tell them to register.");
+          showNotification("Employee added! Tell them to register.");
       } catch (err) {
           console.error("Error adding employee:", err);
           showNotification("Error adding employee", "error");
@@ -547,7 +530,7 @@ export default function App() {
       if (deleteEmployeeId === empId) {
           try {
               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'team_members', empId));
-              showNotification(lang === 'hr' ? "Zaposlenik obrisan" : "Employee removed");
+              showNotification("Employee removed");
               setDeleteEmployeeId(null);
           } catch(err) {
               console.error(err);
@@ -632,7 +615,7 @@ export default function App() {
           updateApp(selectedAppointment.id, { reportNotes: newNotes });
           setSelectedAppointment({ ...selectedAppointment, reportNotes: newNotes });
           setIsTemplateModalOpen(false);
-          showNotification(lang === 'hr' ? "Predložak primijenjen" : "Template applied");
+          showNotification("Template applied");
       }
   };
 
@@ -646,7 +629,7 @@ export default function App() {
   const review = appointments.filter(a => a.status === 'review' && filterFn(a));
   const done = appointments.filter(a => a.status === 'done' && filterFn(a));
   const archived = appointments.filter(a => a.status === 'archived' && filterFn(a));
-  useEffect(() => { if (selectedAppointment && view === 'detail') { setFoodData(generateRouteRestaurants(selectedAppointment.city, lang)); } }, [selectedAppointment, view, lang]);
+  useEffect(() => { if (selectedAppointment && view === 'detail') { setFoodData(generateRouteRestaurants(selectedAppointment.city)); } }, [selectedAppointment, view]);
 
   const generateDemoData = async () => {
     if (!user) return;
@@ -862,6 +845,13 @@ export default function App() {
                   <div className="space-y-3">
                     <Input label={t.emailLabel} type="email" value={authData.email} onChange={e => setAuthData({...authData, email: e.target.value})} placeholder="name@company.com" />
                     <Input label={t.passLabel} type="password" value={authData.password} onChange={e => setAuthData({...authData, password: e.target.value})} placeholder="••••••••" />
+                    {authMode === 'login' && (
+                        <div className="flex justify-end">
+                            <button onClick={handlePasswordReset} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                                <KeyRound size={12}/> {t.forgotPassword}
+                            </button>
+                        </div>
+                    )}
                   </div>
                   <Button fullWidth onClick={handleAuth} icon={authMode === 'login' ? LogIn : UserPlus} className="h-12 text-lg shadow-lg shadow-blue-200">{authMode === 'login' ? t.loginBtn : t.registerBtn}</Button>
                   <div className="pt-4 border-t border-slate-100 space-y-3">
@@ -976,7 +966,7 @@ export default function App() {
 
   if(view === 'detail' && selectedAppointment) {
     const a = selectedAppointment;
-    const handleReportUpdate = (noteText) => { const finalText = generateReportText(noteText, a.customerName, a.date, a.category, lang); updateApp(a.id, { reportNotes: noteText, finalReport: finalText }); setSelectedAppointment({ ...a, reportNotes: noteText, finalReport: finalText }); };
+    const handleReportUpdate = (noteText) => { const finalText = generateReportText(noteText, a.customerName, a.date, a.category); updateApp(a.id, { reportNotes: noteText, finalReport: finalText }); setSelectedAppointment({ ...a, reportNotes: noteText, finalReport: finalText }); };
     const statusColor = a.status==='archived' ? 'bg-slate-500' : a.status==='done' ? 'bg-green-600' : a.status==='pending' ? 'bg-orange-500' : 'bg-blue-600';
     const statusLabel = a.status === 'incoming' ? t.colIncoming : a.status === 'pending' ? t.colPending : a.status === 'done' ? t.colDone : t.colArchived;
     
@@ -1042,6 +1032,27 @@ export default function App() {
                </Button>
             </div>
         </div>
+
+        {/* TEMPLATE MODAL (Select Mode) */}
+        {isTemplateModalOpen && templateModalMode === 'select' && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in flex flex-col max-h-[80vh]">
+                    <div className="p-4 border-b flex justify-between items-center bg-slate-50 flex-shrink-0">
+                        <h3 className="font-bold text-lg text-slate-800">{t.selectTemplate}</h3>
+                        <button onClick={() => setIsTemplateModalOpen(false)} className="p-1 hover:bg-slate-200 rounded-full"><X size={20}/></button>
+                    </div>
+                    <div className="p-4 overflow-y-auto space-y-3">
+                        {templates.map(tpl => (
+                            <div key={tpl.id} onClick={() => applyTemplate(tpl.content)} className="p-3 border rounded-xl hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-all">
+                                <h4 className="font-bold text-slate-800">{tpl.name}</h4>
+                                <p className="text-xs text-slate-500 line-clamp-2 mt-1">{tpl.content}</p>
+                            </div>
+                        ))}
+                        {templates.length === 0 && <p className="text-center text-slate-400 py-4 italic">No templates found.</p>}
+                    </div>
+                </div>
+            </div>
+        )}
       </div>
     );
   }
@@ -1059,11 +1070,12 @@ export default function App() {
             {role === 'admin' && (
                 <button onClick={() => setView('team')} className={`p-2 rounded-lg ${view==='team'?'bg-blue-50 text-blue-600':'text-slate-400'}`} title={t.navTeam}><Users size={20}/></button>
             )}
-            {/* REMOVED ARCHIVE BUTTON AS REQUESTED */}
-            <button onClick={() => setLang(l => l==='hr'?'en':'hr')} className="px-2 bg-slate-100 rounded text-xs font-bold text-slate-500 border border-slate-200">{lang.toUpperCase()}</button>
             <button onClick={handleLogout} className="px-2 bg-red-50 rounded text-xs font-bold text-red-500 border border-red-200"><LogOut size={16}/></button>
-            {/* DEBUG TOGGLE FOR ROLE (Hidden in production usually) */}
-            <button onClick={() => setRole(r => r === 'admin' ? 'user' : 'admin')} className="px-2 bg-gray-100 rounded text-xs font-bold text-gray-400 border border-gray-200" title="Toggle Admin Role (Debug)"><Shield size={12}/></button>
+            
+            {/* DEBUG TOGGLE FOR ROLE (Restricted to Admins) */}
+            {role === 'admin' && (
+                <button onClick={() => setRole(r => r === 'admin' ? 'user' : 'admin')} className="px-2 bg-gray-100 rounded text-xs font-bold text-gray-400 border border-gray-200" title="Toggle Admin Role (Debug)"><Shield size={12}/></button>
+            )}
          </div>
       </div>
 
@@ -1078,20 +1090,20 @@ export default function App() {
               {!isMobile && (
                   <div className="flex flex-row h-full w-full divide-x divide-slate-200">
                       {/* Pass teamMembers Prop and ROLE */}
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
                   </div>
               )}
               {/* MOBILE VIEW: Stacked with Padding */}
               {isMobile && (
                   <div className="flex flex-col gap-4 p-4 overflow-y-auto h-full custom-scrollbar">
                       {/* Pass teamMembers Prop and ROLE */}
-                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
-                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
-                      <KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
-                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
+                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
+                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
+                      <KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
+                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
                   </div>
               )}
             </>
