@@ -16,15 +16,23 @@ import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc
 
 // --- Firebase Configuration ---
 let firebaseConfig;
+let initError = "";
+
 try {
+  // Versuch 1: Automatische Config (Preview Umgebung)
   if (typeof __firebase_config !== 'undefined') {
     firebaseConfig = JSON.parse(__firebase_config);
-  } else {
+  } 
+} catch (e) { console.warn("Auto-Config failed:", e); }
+
+// Versuch 2: Manuelle Config (Lokal / Fallback)
+if (!firebaseConfig) {
     // -----------------------------------------------------------
-    // HIER DEINE DATEN EINTRAGEN (aus der Firebase Console)
+    // WICHTIG FÜR LOKALES TESTEN:
+    // Ersetze diesen Block mit deinen ECHTEN Daten aus der Firebase Console!
+    // (Project Settings -> General -> Your apps -> SDK setup/config)
     // -----------------------------------------------------------
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
+    firebaseConfig = {
       apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
       authDomain: "dc-inspect.firebaseapp.com",
       projectId: "dc-inspect",
@@ -33,22 +41,19 @@ try {
       appId: "1:639013498118:web:15146029fbc159cbd30287",
       measurementId: "G-5TETMHQ1EW"
     };
-  }
-} catch (e) { console.error("Config Error", e); }
+}
 
 let app, auth, db;
-let initError = "";
-
 try {
-  if (!firebaseConfig || firebaseConfig.apiKey === "HIER_DEIN_API_KEY_EINFÜGEN") {
-      // Wenn keine Config da ist, werfen wir keinen harten Fehler, sondern merken uns das
-      // damit die UI das anzeigen kann statt weiß zu bleiben.
-      console.warn("Firebase Config fehlt oder ist Platzhalter.");
-  } else {
-      app = initializeApp(firebaseConfig);
-      auth = getAuth(app);
-      db = getFirestore(app);
+  // Prüfen, ob wir nur den Platzhalter haben (dann wird Auth fehlschlagen)
+  if (firebaseConfig.apiKey === "HIER_DEIN_API_KEY_EINFÜGEN" && typeof __firebase_config === 'undefined') {
+     console.warn("ACHTUNG: Firebase Config sind nur Platzhalter!");
+     initError = "Platzhalter-Config erkannt. Bitte echte Daten in src/App.jsx eintragen.";
   }
+  
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
 } catch (error) { 
     console.error("Firebase Init Error:", error); 
     initError = error.message;
@@ -62,13 +67,6 @@ const TEAM_MEMBERS = [
   { id: 'anna', name: 'Anna Müller', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna' },
   { id: 'max', name: 'Max Mustermann', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
   { id: 'tom', name: 'Tom B.', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tom' },
-];
-
-const MOCK_TEMPLATES = [
-    { id: 1, name: "Standard Hausinspektion", created: "2024-01-10", author: "Ich (Admin)" },
-    { id: 2, name: "Wasserschaden Analyse", created: "2024-02-15", author: "Anna Müller" },
-    { id: 3, name: "Dach & Fassade", created: "2024-03-01", author: "Ich (Admin)" },
-    { id: 4, name: "Elektro-Check (VDE)", created: "2024-03-20", author: "Tom B." }
 ];
 
 const getRandomQuote = () => {
@@ -235,7 +233,7 @@ export default function App() {
     const initAuth = async () => {
       try {
         if (!app) {
-           // Fallback UI wird unten getriggert, hier nichts tun
+           // Fallback UI wird unten getriggert
            return; 
         }
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -399,7 +397,7 @@ export default function App() {
     setLoading(false);
   };
 
-  // --- ADMIN DASHBOARD ---
+  // --- ADMIN DASHBOARD RENDER HELPERS ---
   const renderAdminSidebar = () => (
       <div className={`bg-slate-900 text-white w-full md:w-64 flex-shrink-0 flex flex-col ${isMobile ? 'h-auto' : 'h-screen'}`}>
           <div className="p-4 flex items-center gap-3 border-b border-slate-800">
