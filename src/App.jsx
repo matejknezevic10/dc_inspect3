@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database, Eye
+  Calendar, MapPin, CheckSquare, Plus, Navigation, Fuel, Utensils, Clock, Search, Trash2, Save, ArrowLeft, Briefcase, ExternalLink, TrendingDown, Coffee, Globe, FileText, CheckCircle, Loader, Printer, Download, Camera, Image as ImageIcon, X, MoreVertical, GripHorizontal, Search as SearchIcon, AlertTriangle, LayoutDashboard, Archive, Undo, Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, Shield
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { 
@@ -23,7 +23,8 @@ try {
     // -----------------------------------------------------------
     // HIER DEINE DATEN EINTRAGEN (aus der Firebase Console)
     // -----------------------------------------------------------
-    const firebaseConfig = {
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
       apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
       authDomain: "dc-inspect.firebaseapp.com",
       projectId: "dc-inspect",
@@ -36,20 +37,31 @@ try {
 } catch (e) { console.error("Config Error", e); }
 
 let app, auth, db;
+let initError = "";
+
 try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (error) { console.error("Firebase Init Error:", error); }
+  if (!firebaseConfig || firebaseConfig.apiKey === "HIER_DEIN_API_KEY_EINFÜGEN") {
+      // Wenn keine Config da ist, werfen wir keinen harten Fehler, sondern merken uns das
+      // damit die UI das anzeigen kann statt weiß zu bleiben.
+      console.warn("Firebase Config fehlt oder ist Platzhalter.");
+  } else {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+  }
+} catch (error) { 
+    console.error("Firebase Init Error:", error); 
+    initError = error.message;
+}
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // --- MOCK DATA ---
 const TEAM_MEMBERS = [
-  { id: 'me', name: 'Ich (Admin)', role: 'Geschäftsführer', email: 'boss@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
-  { id: 'anna', name: 'Anna Müller', role: 'Senior Inspektor', email: 'anna@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna' },
-  { id: 'max', name: 'Max Mustermann', role: 'Junior Inspektor', email: 'max@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
-  { id: 'tom', name: 'Tom B.', role: 'Techniker', email: 'tom@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tom' },
+  { id: 'me', name: 'Ich (Admin)', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
+  { id: 'anna', name: 'Anna Müller', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna' },
+  { id: 'max', name: 'Max Mustermann', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
+  { id: 'tom', name: 'Tom B.', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tom' },
 ];
 
 const MOCK_TEMPLATES = [
@@ -218,32 +230,47 @@ export default function App() {
 
   useEffect(() => { setDailyQuote(getRandomQuote()); const handleResize = () => setIsMobile(window.innerWidth <768); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, []);
 
+  // Updated Init & Auth Effect with safety checks
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (!app) throw new Error("Firebase not initialized");
+        if (!app) {
+           // Fallback UI wird unten getriggert, hier nichts tun
+           return; 
+        }
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
            await signInWithCustomToken(auth, __initial_auth_token);
         } 
       } catch (err) { console.warn("Auto-login skipped:", err); }
     };
-    initAuth();
-
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        const userProfileRef = doc(db, 'artifacts', appId, 'users', u.uid, 'account', 'profile');
-        const snap = await getDoc(userProfileRef);
-        if (snap.exists()) { setRole(snap.data().role); } else { setRole('admin'); }
-        setUser(u);
-        setView('dashboard');
-      } else {
-        setUser(null);
-        setRole(null);
-        setView('login');
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    
+    if (auth) {
+        initAuth();
+        const unsubscribe = onAuthStateChanged(auth, async (u) => {
+          if (u) {
+            // Check Profile if DB is available
+            if(db) {
+                const userProfileRef = doc(db, 'artifacts', appId, 'users', u.uid, 'account', 'profile');
+                try {
+                    const snap = await getDoc(userProfileRef);
+                    if (snap.exists()) { setRole(snap.data().role); } else { setRole('admin'); }
+                } catch(e) { console.warn("Profile fetch error", e); setRole('admin'); }
+            }
+            setUser(u);
+            setView('dashboard');
+          } else {
+            setUser(null);
+            setRole(null);
+            setView('login');
+          }
+          setLoading(false);
+        });
+        return () => unsubscribe();
+    } else {
+        setLoading(false);
+        // If auth is missing, we likely have a config error
+        if(initError) setErrorMsg("Firebase Setup Error: " + initError);
+    }
   }, []);
 
   useEffect(() => {
@@ -264,6 +291,7 @@ export default function App() {
   }, [user]);
 
   const handleAuth = async () => {
+    if(!auth) { setAuthError("Firebase not connected."); return; }
     setLoading(true);
     setAuthError('');
     setAuthErrorCode('');
@@ -272,11 +300,13 @@ export default function App() {
             await signInWithEmailAndPassword(auth, authData.email, authData.password);
         } else {
             const userCredential = await createUserWithEmailAndPassword(auth, authData.email, authData.password);
-            await setDoc(doc(db, 'artifacts', appId, 'users', userCredential.user.uid, 'account', 'profile'), {
-                email: authData.email,
-                role: 'admin',
-                joined: serverTimestamp()
-            });
+            if(db) {
+                await setDoc(doc(db, 'artifacts', appId, 'users', userCredential.user.uid, 'account', 'profile'), {
+                    email: authData.email,
+                    role: 'admin',
+                    joined: serverTimestamp()
+                });
+            }
             setRole('admin');
         }
     } catch (e) {
@@ -293,6 +323,7 @@ export default function App() {
   };
 
   const handleDemoAuth = async () => {
+      if(!auth) return;
       setLoading(true);
       setAuthError('');
       try {
@@ -307,18 +338,18 @@ export default function App() {
       }
   };
 
-  const handleLogout = async () => { await signOut(auth); };
+  const handleLogout = async () => { if(auth) await signOut(auth); };
 
   const saveApp = async (data) => {
-    if(!user) return;
+    if(!user || !db) return;
     await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'appointments'), { 
         ...data, status: 'incoming', createdAt: serverTimestamp(), reportImages:[],
         todos: [ { text: t.defaultTask1, done: false }, { text: t.defaultTask2, done: false }, { text: t.defaultTask3, done: false }, { text: t.defaultTask4, done: false } ]
     });
     setView('dashboard');
   };
-  const updateApp = async (id, data) => { if(!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id), data); };
-  const deleteApp = async (id) => { if(!user) return; if(confirm(t.confirmDelete)) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id)); setView('dashboard'); }};
+  const updateApp = async (id, data) => { if(!user || !db) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id), data); };
+  const deleteApp = async (id) => { if(!user || !db) return; if(confirm(t.confirmDelete)) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'appointments', id)); setView('dashboard'); }};
   const handleUpdateStatus = (id, s) => { updateApp(id, {status: s}); if(selectedAppointment && selectedAppointment.id === id) setSelectedAppointment({...selectedAppointment, status: s}); };
   const getCategoryLabel = (k) => { const m = { 'inspection': t.catInspection, 'consulting': t.catConsulting, 'emergency': t.catEmergency }; return m[k] || k; };
   const triggerStationNav = (name, city) => { safeOpen(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${city}`)}`); };
@@ -333,7 +364,7 @@ export default function App() {
 
   // NEW FUNCTION: Generate Demo Data
   const generateDemoData = async () => {
-    if (!user) return;
+    if (!user || !db) return;
     setLoading(true);
     const demoCustomers = [
       { name: "Müller GmbH", city: "Zagreb", address: "Ilica 10", cat: "inspection", req: "Jahresinspektion Heizung" },
@@ -347,9 +378,7 @@ export default function App() {
       { name: "Restaurant Plavi", city: "Šibenik", address: "Obala 4", cat: "inspection", req: "Hygieneinspektion" },
       { name: "Logistikzentrum", city: "Varaždin", address: "Industrija 9", cat: "inspection", req: "Lüftungsanlage" }
     ];
-
     const statuses = ['incoming', 'incoming', 'pending', 'pending', 'review', 'review', 'done', 'done', 'archived', 'incoming'];
-
     try {
         const batchPromises = demoCustomers.map(async (c, i) => {
             const randomStatus = statuses[i];
@@ -357,7 +386,6 @@ export default function App() {
             const date = new Date();
             date.setDate(date.getDate() + (i - 2)); 
             const dateStr = date.toISOString().split('T')[0];
-
             await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'appointments'), {
                 customerName: c.name, city: c.city, address: c.address, date: dateStr, time: `0${8 + (i%8)}:00`,
                 request: c.req, category: c.cat, status: randomStatus, assignedTo: randomMember, createdAt: serverTimestamp(),
@@ -371,7 +399,7 @@ export default function App() {
     setLoading(false);
   };
 
-  // --- ADMIN DASHBOARD RENDER HELPERS ---
+  // --- ADMIN DASHBOARD ---
   const renderAdminSidebar = () => (
       <div className={`bg-slate-900 text-white w-full md:w-64 flex-shrink-0 flex flex-col ${isMobile ? 'h-auto' : 'h-screen'}`}>
           <div className="p-4 flex items-center gap-3 border-b border-slate-800">
@@ -439,7 +467,7 @@ export default function App() {
       );
   }
 
-  // 4. TEAM / ADMIN DASHBOARD (New Layout)
+  // 4. TEAM / ADMIN DASHBOARD
   if (view === 'team') {
       return (
           <div className={`min-h-screen bg-slate-50 font-sans text-slate-900 ${isMobile ? 'flex-col' : 'flex'}`}>
