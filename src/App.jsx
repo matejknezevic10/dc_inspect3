@@ -8,7 +8,7 @@ import {
   Quote, FolderArchive, Wand2, LogIn, Lock, Check, CreditCard, Users, 
   UserCheck, Map as MapIcon, CalendarPlus, LogOut, UserPlus, HelpCircle, 
   Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database, Info,
-  ChevronLeft, ChevronRight, FilePlus, UserX, KeyRound
+  ChevronLeft, ChevronRight, FilePlus, UserX, KeyRound, Edit, User
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { 
@@ -39,17 +39,17 @@ import {
 } from "firebase/firestore";
 
 // --- Firebase Configuration ---
-  const firebaseConfig = {
-        apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
-        authDomain: "dc-inspect.firebaseapp.com",
-        projectId: "dc-inspect",
-        storageBucket: "dc-inspect.firebasestorage.app",
-        messagingSenderId: "639013498118",
-        appId: "1:639013498118:web:15146029fbc159cbd30287",
-        measurementId: "G-5TETMHQ1EW"
-  };
-  
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const firebaseConfig = {
+  apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
+  authDomain: "dc-inspect.firebaseapp.com",
+  projectId: "dc-inspect",
+  storageBucket: "dc-inspect.firebasestorage.app",
+  messagingSenderId: "639013498118",
+  appId: "1:639013498118:web:15146029fbc159cbd30287",
+  measurementId: "G-5TETMHQ1EW"
+};
+
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 let app, auth, db;
 try {
@@ -150,7 +150,8 @@ const TEXT = {
     addTemplate: "Insert Template", selectTemplate: "Select Template", createTemplate: "Create Template", import: "Import", templateName: "Template Name", templateContent: "Content",
     guestMessage: "Your account is pending approval or you have not been added to the team. Please contact your administrator.",
     guestTitle: "Access Restricted",
-    forgotPassword: "Forgot Password?", resetEmailSent: "Password reset email sent!", resetError: "Error sending reset email."
+    forgotPassword: "Forgot Password?", resetEmailSent: "Password reset email sent!", resetError: "Error sending reset email.",
+    editEmployee: "Edit Employee", uploadPhoto: "Upload Photo", avatarUrl: "Avatar URL"
 };
 
 // ... Helpers ...
@@ -254,6 +255,7 @@ export default function App() {
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
   const [newEmployeeData, setNewEmployeeData] = useState({ name: '', role: '', email: '' });
   const [deleteEmployeeId, setDeleteEmployeeId] = useState(null); 
+  const [editingEmployee, setEditingEmployee] = useState(null); // NEW: State for editing employee
   
   // New States for Template Modal
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -526,6 +528,23 @@ export default function App() {
       }
   };
 
+  const handleUpdateEmployee = async () => {
+    if (!editingEmployee || !editingEmployee.name || !editingEmployee.email) return;
+    try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'team_members', editingEmployee.id), {
+            name: editingEmployee.name,
+            role: editingEmployee.role,
+            email: editingEmployee.email,
+            avatar: editingEmployee.avatar
+        });
+        setEditingEmployee(null);
+        showNotification("Employee updated");
+    } catch (err) {
+        console.error(err);
+        showNotification("Error updating", "error");
+    }
+  };
+
   const handleDeleteEmployee = async (empId) => {
       if (deleteEmployeeId === empId) {
           try {
@@ -744,13 +763,22 @@ export default function App() {
                                 </div>
                                 <p className="text-xs text-blue-600 mt-1">{member.email}</p>
                             </div>
-                            <button 
-                                onClick={() => handleDeleteEmployee(member.id)} 
-                                className={`p-2 rounded-full transition-all absolute top-2 right-2 ${deleteEmployeeId === member.id ? 'bg-red-600 text-white opacity-100' : 'text-red-400 hover:bg-red-50 hover:text-red-600 opacity-0 group-hover:opacity-100'}`}
-                                title="Remove"
-                            >
-                                {deleteEmployeeId === member.id ? <Check size={16} /> : <Trash2 size={16} />}
-                            </button>
+                            <div className="flex flex-col gap-1 absolute top-2 right-2">
+                                <button 
+                                    onClick={() => setEditingEmployee(member)} 
+                                    className="p-2 rounded-full text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Edit"
+                                >
+                                    <Edit size={16} />
+                                </button>
+                                <button 
+                                    onClick={() => handleDeleteEmployee(member.id)} 
+                                    className={`p-2 rounded-full transition-all ${deleteEmployeeId === member.id ? 'bg-red-600 text-white opacity-100' : 'text-red-400 hover:bg-red-50 hover:text-red-600 opacity-0 group-hover:opacity-100'}`}
+                                    title="Remove"
+                                >
+                                    {deleteEmployeeId === member.id ? <Check size={16} /> : <Trash2 size={16} />}
+                                </button>
+                            </div>
                         </Card>
                     ))}
                 </div>
@@ -887,6 +915,53 @@ export default function App() {
               </div>
               <Toast message={notification?.msg} type={notification?.type} onClose={() => setNotification(null)} />
               
+              {/* EDIT EMPLOYEE MODAL */}
+              {editingEmployee && (
+                  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+                      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+                          <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                              <h3 className="font-bold text-lg text-slate-800">{t.editEmployee}</h3>
+                              <button onClick={() => setEditingEmployee(null)} className="p-1 hover:bg-slate-200 rounded-full"><X size={20}/></button>
+                          </div>
+                          <div className="p-6 space-y-4">
+                              <div className="flex items-center gap-4 mb-4">
+                                  <img src={editingEmployee.avatar} className="w-20 h-20 rounded-full border-2 border-slate-100 bg-slate-50 object-cover" />
+                                  <div className="flex-1">
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.uploadPhoto}</label>
+                                      <div className="flex gap-2">
+                                          <label className="cursor-pointer bg-blue-50 text-blue-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors flex items-center gap-2">
+                                              <Camera size={14}/> Upload
+                                              <input type="file" className="hidden" accept="image/*" onChange={async (e) => { 
+                                                  if(e.target.files[0]) { 
+                                                      const b64 = await compressImage(e.target.files[0]); 
+                                                      setEditingEmployee({...editingEmployee, avatar: b64}); 
+                                                  }
+                                              }}/>
+                                          </label>
+                                      </div>
+                                  </div>
+                              </div>
+                              
+                              <Input label={t.nameLabel} value={editingEmployee.name} onChange={e => setEditingEmployee({...editingEmployee, name: e.target.value})} />
+                              
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.roleLabel}</label>
+                                  <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" value={editingEmployee.role} onChange={e => setEditingEmployee({...editingEmployee, role: e.target.value})}>
+                                      <option value="staff">Staff</option>
+                                      <option value="admin">Admin</option>
+                                  </select>
+                              </div>
+
+                              <Input label={t.emailLabel} value={editingEmployee.email} onChange={e => setEditingEmployee({...editingEmployee, email: e.target.value})} />
+                              
+                              <Input label={t.avatarUrl} value={editingEmployee.avatar} onChange={e => setEditingEmployee({...editingEmployee, avatar: e.target.value})} placeholder="https://..." />
+
+                              <Button fullWidth onClick={handleUpdateEmployee} icon={Save}>{t.save}</Button>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
               {/* TEMPLATE MODAL (Create Mode) */}
               {isTemplateModalOpen && templateModalMode === 'create' && (
                   <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
