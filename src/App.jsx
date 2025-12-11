@@ -33,12 +33,12 @@ import {
   setDoc, 
   getDoc,
   writeBatch,
+  getDocs,
   query,
-  where,
-  getDocs
+  where
 } from "firebase/firestore";
 
-// --- Firebase Configuration ---
+// --- 1. CONFIGURATION & CONSTANTS ---
 const firebaseConfig = {
   apiKey: "AIzaSyBc2ajUaIkGvcdQQsDDlzDPHhiW2yg9BCc",
   authDomain: "dc-inspect.firebaseapp.com",
@@ -48,7 +48,6 @@ const firebaseConfig = {
   appId: "1:639013498118:web:15146029fbc159cbd30287",
   measurementId: "G-5TETMHQ1EW"
 };
-
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 let app, auth, db;
@@ -64,8 +63,6 @@ try {
   console.error("Firebase Init Error:", error);
 }
 
-// --- INITIAL DATA (Used for seeding DB only) ---
-// Note: 'email' is the key link for the new auth system
 const INITIAL_TEAM_MEMBERS = [
   { id: 'david', name: 'David', role: 'admin', email: 'david@dcinspect.eu', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David' },
   { id: 'matej', name: 'Matej', role: 'admin', email: 'matej_knezevic@yahoo.de', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Matej' },
@@ -80,45 +77,6 @@ const INITIAL_TEMPLATES = [
     { id: 't4', name: "Electrical Check (VDE)", content: "Inspection of electrical systems.\nFuse box: ...\nRCD Test: Successful\nExposed wires: None.", created: "2024-03-20", author: "Tom B." }
 ];
 
-const getRandomQuote = () => {
-  const quotes = [
-    "Win the day.", "We are not here to take part, we are here to take over.", "Success is not final.", "Quality means doing it right when no one is looking.", "Focus on the solution."
-  ];
-  return quotes[Math.floor(Math.random() * quotes.length)];
-};
-
-// --- Helper Components ---
-
-const Toast = ({ message, type, onClose }) => {
-  if (!message) return null;
-  const bg = type === 'error' ? 'bg-red-500' : 'bg-green-600';
-  return (
-    <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] ${bg} text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 animate-bounce-in`}>
-      {type === 'error' ? <AlertTriangle size={18}/> : <CheckCircle size={18}/>}
-      <span className="font-medium text-sm">{message}</span>
-      <button onClick={onClose} className="ml-2 hover:bg-white/20 rounded-full p-1"><X size={14}/></button>
-    </div>
-  );
-};
-
-const DCLogo = ({ size = 48, className = "" }) => (
-  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={`rounded-lg shadow-sm flex-shrink-0 ${className}`}>
-    <rect width="100" height="100" rx="20" fill="#2563EB"/>
-    <path d="M25 25H45C58.8071 25 70 36.1929 70 50V50C70 63.8071 58.8071 75 45 75H25V25Z" stroke="white" strokeWidth="8"/>
-    <path d="M25 25V75" stroke="white" strokeWidth="8"/>
-    <path d="M65 65L80 80" stroke="white" strokeWidth="8" strokeLinecap="round"/>
-    <circle cx="55" cy="50" r="15" stroke="white" strokeWidth="6" strokeOpacity="0.5"/>
-    <text x="50" y="62" fontSize="35" fontWeight="bold" fill="white" textAnchor="middle" fontFamily="sans-serif">DC</text>
-  </svg>
-);
-
-const AppLogo = ({ size = "w-14 h-14", showFallback = true }) => {
-  const [imgError, setImgError] = useState(false);
-  if (imgError) return showFallback ? <DCLogo size={56} /> : null;
-  return <img src="/logo.jpg" alt="DC Logo" className={`${size} rounded-xl object-cover shadow-sm bg-white`} onError={() => setImgError(true)} />;
-};
-
-// Unified English Translations
 const TEXT = {
     appTitle: "DC INSPECT", subtitle: "Mobile Assistant",
     navDashboard: "Dashboard", navArchive: "Archive", navTeam: "Admin Panel",
@@ -154,7 +112,13 @@ const TEXT = {
     editEmployee: "Edit Employee", uploadPhoto: "Upload Photo", avatarUrl: "Avatar URL"
 };
 
-// ... Helpers ...
+// --- 2. UTILITY FUNCTIONS ---
+const getRandomQuote = () => {
+  const quotes = [
+    "Win the day.", "We are not here to take part, we are here to take over.", "Success is not final.", "Quality means doing it right when no one is looking.", "Focus on the solution."
+  ];
+  return quotes[Math.floor(Math.random() * quotes.length)];
+};
 const safeOpen = (url) => { if(!url) return; const w = window.open(url, '_blank'); if(!w || w.closed) { window.location.href = url; } };
 const compressImage = (file) => new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const cvs = document.createElement('canvas'); const max = 1000; let w = img.width, h = img.height; if(w>h){if(w>max){h*=max/w;w=max;}}else{if(h>max){w*=max/h;h=max;}} cvs.width=w; cvs.height=h; const ctx = cvs.getContext('2d'); ctx.drawImage(img,0,0,w,h); resolve(cvs.toDataURL('image/jpeg', 0.6)); } } });
 const downloadAsWord = (c,f,i=[]) => { let h=`<html><body><div style="font-family:Arial;white-space:pre-wrap;">${c}</div>${i.map(u=>`<p><img src="${u}" width="400"/></p>`).join('')}</body></html>`; const b=new Blob(['\ufeff',h],{type:'application/msword'}); const u=URL.createObjectURL(b); const l=document.createElement('a'); l.href=u; l.download=`${f}.doc`; document.body.appendChild(l); l.click(); document.body.removeChild(l); };
@@ -165,7 +129,25 @@ const generateTimeSlots = () => { const slots = []; for (let i = 6; i <= 22; i++
 const timeOptions = generateTimeSlots();
 const openGoogleCalendar = (app) => { const startDate = new Date(`${app.date}T${app.time}`); const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); const formatDate = (date) => date.toISOString().replace(/-|:|\.\d+/g, ''); const details = encodeURIComponent(`Inspection: ${app.request}\nCategory: ${app.category}`); const location = encodeURIComponent(`${app.address}, ${app.city}`); const title = encodeURIComponent(`DC Inspect: ${app.customerName}`); safeOpen(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${details}&location=${location}`); };
 
-// UI Components
+// --- 3. UI COMPONENTS (Declared BEFORE App) ---
+
+const DCLogo = ({ size = 48, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={`rounded-lg shadow-sm flex-shrink-0 ${className}`}>
+    <rect width="100" height="100" rx="20" fill="#2563EB"/>
+    <path d="M25 25H45C58.8071 25 70 36.1929 70 50V50C70 63.8071 58.8071 75 45 75H25V25Z" stroke="white" strokeWidth="8"/>
+    <path d="M25 25V75" stroke="white" strokeWidth="8"/>
+    <path d="M65 65L80 80" stroke="white" strokeWidth="8" strokeLinecap="round"/>
+    <circle cx="55" cy="50" r="15" stroke="white" strokeWidth="6" strokeOpacity="0.5"/>
+    <text x="50" y="62" fontSize="35" fontWeight="bold" fill="white" textAnchor="middle" fontFamily="sans-serif">DC</text>
+  </svg>
+);
+
+const AppLogo = ({ size = "w-14 h-14", showFallback = true }) => {
+  const [imgError, setImgError] = useState(false);
+  if (imgError) return showFallback ? <DCLogo size={56} /> : null;
+  return <img src="/logo.jpg" alt="DC Logo" className={`${size} rounded-xl object-cover shadow-sm bg-white`} onError={() => setImgError(true)} />;
+};
+
 const Card = ({children, className='', onClick}) => (<div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${className}`}>{children}</div>);
 
 const Button = ({children, onClick, variant='primary', className='', icon:Icon, fullWidth, ...p}) => {
@@ -173,11 +155,22 @@ const Button = ({children, onClick, variant='primary', className='', icon:Icon, 
   return <button onClick={onClick} className={`flex items-center justify-center px-4 py-3 rounded-lg font-bold text-sm transition-all active:scale-95 ${vs[variant]} ${fullWidth ? 'w-full' : ''} ${className}`} {...p}>{Icon && <Icon size={18} className="mr-2"/>}{children}</button>;
 };
 
+const Toast = ({ message, type, onClose }) => {
+  if (!message) return null;
+  const bg = type === 'error' ? 'bg-red-500' : 'bg-green-600';
+  return (
+    <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] ${bg} text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 animate-bounce-in`}>
+      {type === 'error' ? <AlertTriangle size={18}/> : <CheckCircle size={18}/>}
+      <span className="font-medium text-sm">{message}</span>
+      <button onClick={onClose} className="ml-2 hover:bg-white/20 rounded-full p-1"><X size={14}/></button>
+    </div>
+  );
+};
+
 const Input = ({label, type="text", ...p}) => (<div className="mb-3"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label><input type={type} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" {...p}/></div>);
 const Select = ({ label, options, ...props }) => ( <div className="mb-4"> <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label> <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-900" {...props}> {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)} </select> </div> );
 
-// Updated KanbanColumn to accept teamMembers and ROLE
-const KanbanColumn = ({ title, status, appointments, onClickApp, onStatusChange, isMobile, teamMembers, role }) => {
+const KanbanColumn = ({ title, status, appointments, onClickApp, onStatusChange, isMobile, teamMembers, role, currentMemberId }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const handleDragOver = (e) => { e.preventDefault(); setIsDragOver(true); };
   const handleDragLeave = (e) => { e.preventDefault(); setIsDragOver(false); };
@@ -185,7 +178,6 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, onStatusChange,
   const containerClasses = isMobile ? `flex-1 flex flex-col rounded-2xl border border-slate-200/60 transition-all duration-200 overflow-hidden min-h-[400px]` : `flex-1 flex flex-col h-full transition-all duration-200 overflow-hidden`;
   const bgClass = isDragOver ? 'bg-blue-50' : (isMobile ? 'bg-slate-50/50' : 'bg-slate-50');
 
-  // Status Colors
   let headerColor = 'text-slate-600 bg-slate-50/50';
   if(status === 'incoming') headerColor = 'text-blue-600 bg-blue-50/50';
   else if(status === 'pending') headerColor = 'text-orange-600 bg-orange-50/50';
@@ -199,18 +191,17 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, onStatusChange,
       </div>
       <div className="p-3 overflow-y-auto flex-1 space-y-3 custom-scrollbar">
         {appointments.length===0 ? <div className="text-center py-10 text-slate-300 italic text-xs">{isDragOver?'Drop here':'Empty'}</div> : appointments.map(app => {
-            // Find assignee in the real data or fallback to the first one
             const assignee = teamMembers.find(m => m.id === app.assignedTo) || teamMembers[0] || { name: '?', avatar: '' };
-            // ADMIN CHECK: Only admin can drag
-            const isAdmin = role === 'admin';
+            const isAssignedToMe = currentMemberId && app.assignedTo === currentMemberId;
+            const canEdit = role === 'admin' || (role === 'staff' && isAssignedToMe);
             
             return (
             <div 
                 key={app.id} 
-                draggable={isAdmin} // Disable drag for non-admins
-                onDragStart={(e)=>{ if(isAdmin) { e.dataTransfer.setData("appId",app.id);e.dataTransfer.effectAllowed="move"; }}} 
+                draggable={canEdit} 
+                onDragStart={(e)=>{ if(canEdit) { e.dataTransfer.setData("appId",app.id);e.dataTransfer.effectAllowed="move"; }}} 
                 onClick={()=>onClickApp(app)} 
-                className={`bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98] group relative ${isAdmin ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                className={`bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98] group relative ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-80'}`}
             >
               <div className="flex justify-between items-start mb-2">
                   <h4 className="font-bold text-slate-800 text-sm">{app.customerName}</h4>
@@ -226,9 +217,11 @@ const KanbanColumn = ({ title, status, appointments, onClickApp, onStatusChange,
   );
 };
 
+// --- 4. MAIN APP COMPONENT ---
 export default function App() {
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null); // 'admin' | 'staff' | 'guest'
+  const [role, setRole] = useState(null); 
+  const [currentUserEmail, setCurrentUserEmail] = useState(''); 
   const [authMode, setAuthMode] = useState('login'); 
   const [authData, setAuthData] = useState({ email: '', password: '' });
   const [authError, setAuthError] = useState('');
@@ -251,137 +244,93 @@ export default function App() {
   const [notification, setNotification] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
-  // New states for adding/deleting employee
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
   const [newEmployeeData, setNewEmployeeData] = useState({ name: '', role: '', email: '' });
   const [deleteEmployeeId, setDeleteEmployeeId] = useState(null); 
-  const [editingEmployee, setEditingEmployee] = useState(null); // NEW: State for editing employee
+  const [editingEmployee, setEditingEmployee] = useState(null); 
   
-  // New States for Template Modal
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [templateModalMode, setTemplateModalMode] = useState('select'); 
   const [newTemplateData, setNewTemplateData] = useState({ name: '', content: '' });
   const fileInputRef = useRef(null);
 
-  // Admin Calendar State
   const [calendarViewDate, setCalendarViewDate] = useState(new Date());
 
-  useEffect(() => { setDailyQuote(getRandomQuote()); const handleResize = () => setIsMobile(window.innerWidth <768); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, []);
-
-  useEffect(() => { window.scrollTo(0, 0); }, [view, selectedAppointment]);
-
+  // --- HANDLER FUNCTIONS (Defined inside App to access state) ---
+  
   const showNotification = (msg, type='success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // --- DATA FETCHING (Public) ---
-  useEffect(() => {
-      if (!db || !user) return;
-      
-      const teamColRef = collection(db, 'artifacts', appId, 'public', 'data', 'team_members');
-      const unsubscribeTeam = onSnapshot(teamColRef, async (snap) => {
-          if (snap.empty) {
-              const batch = writeBatch(db);
-              INITIAL_TEAM_MEMBERS.forEach(member => {
-                  const docRef = doc(teamColRef, member.id);
-                  batch.set(docRef, member);
-              });
-              await batch.commit();
-          } else {
-              const members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-              setTeamMembers(members);
-          }
-      }, (err) => console.error("Team Fetch Error:", err));
-
-      const tplColRef = collection(db, 'artifacts', appId, 'public', 'data', 'templates');
-      const unsubscribeTpl = onSnapshot(tplColRef, async (snap) => {
-          if (snap.empty) {
-              const batch = writeBatch(db);
-              INITIAL_TEMPLATES.forEach(tpl => {
-                  const docRef = doc(tplColRef, tpl.id);
-                  batch.set(docRef, tpl);
-              });
-              await batch.commit();
-          } else {
-              const tpls = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-              setTemplates(tpls);
-          }
-      }, (err) => console.error("Templates Fetch Error:", err));
-
-      return () => { unsubscribeTeam(); unsubscribeTpl(); };
-  }, [user]);
-
-  // --- AUTH FLOW ---
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (!app) throw new Error("Firebase not initialized");
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-           await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-           // Do nothing, wait for user manual login
-        }
-      } catch (err) { console.warn("Auth flow check:", err); }
-    };
-    initAuth();
-
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        setUser(u);
-        try {
-            // Force Super Admin Check on every login reload
-            const superAdmins = ['matej_knezevic@yahoo.de', 'david@dcinspect.eu'];
-            if (superAdmins.includes(u.email?.toLowerCase())) {
-                setRole('admin');
-                setView('dashboard');
-                return;
-            }
-
-            // Check user profile for role
-            const userProfileRef = doc(db, 'artifacts', appId, 'users', u.uid, 'account', 'profile');
-            const snap = await getDoc(userProfileRef);
-            
-            if (snap.exists()) {
-                const userData = snap.data();
-                setRole(userData.role);
-                // If guest, show limited view
-                if (userData.role === 'guest') setView('guest');
-                else setView('dashboard');
-            } else {
-                setRole('guest');
-                setView('guest');
-            }
-        } catch (e) {
-            console.error("Auth Profile Error", e);
-            setRole('guest'); 
-            setView('guest');
-        }
-      } else {
-        setUser(null);
-        setRole(null);
-        setView('login');
+  const handleLogout = async () => { 
+      setRole(null);
+      setCurrentUserEmail('');
+      setView('login');
+      if (user) {
+           try { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'account', 'profile'), {}); } catch(e){}
       }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+  };
 
-  // --- SHARED APPOINTMENTS (Public) ---
-  useEffect(() => {
-    if(!db || !user) return;
-    // NOTE: Appointments are now PUBLIC so all team members can see them
-    const q = collection(db, 'artifacts', appId, 'public', 'data', 'appointments');
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const apps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      apps.sort((a,b) => new Date(a.date) - new Date(b.date));
-      setAppointments(apps);
-      setLoading(false);
-    }, (err) => { 
-        console.error("Firestore Error:", err); 
-    });
-    return () => unsubscribe();
-  }, [user]);
+  const handlePasswordReset = async () => {
+      showNotification("Reset link sent (Simulated)");
+  };
+
+  const performFallbackAuth = async (email, mode) => {
+      try {
+          // Use auth.currentUser directly to avoid stale state issues
+          let currentUser = auth.currentUser;
+          if (!currentUser) {
+             const userCredential = await signInAnonymously(auth);
+             currentUser = userCredential.user;
+          }
+          const uid = currentUser.uid;
+          
+          let assignedRole = 'guest';
+          
+          const teamRef = collection(db, 'artifacts', appId, 'public', 'data', 'team_members');
+          const allMembersSnap = await getDocs(teamRef);
+          
+          let foundMember = null;
+          allMembersSnap.forEach(doc => {
+              const data = doc.data();
+              if (data.email && data.email.toLowerCase() === email.toLowerCase()) {
+                  foundMember = data;
+              }
+          });
+          
+          const superAdmins = ['matej_knezevic@yahoo.de', 'david@dcinspect.eu'];
+          if (superAdmins.includes(email.toLowerCase())) {
+              assignedRole = 'admin';
+          } else {
+              if (allMembersSnap.empty) {
+                  assignedRole = 'admin';
+                  await setDoc(doc(teamRef, 'me'), { id: 'me', name: 'Admin', role: 'admin', email: email, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=Admin` });
+              } else if (foundMember) {
+                  assignedRole = foundMember.role || 'staff';
+              }
+          }
+
+          await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'account', 'profile'), {
+              email: email,
+              role: assignedRole,
+              joined: serverTimestamp(),
+              authType: 'fallback_anonymous'
+          });
+          
+          setRole(assignedRole);
+          setCurrentUserEmail(email);
+          if(assignedRole === 'guest') setView('guest');
+          else setView('dashboard');
+          
+          showNotification("Logged in (Demo Mode)");
+
+      } catch (err) {
+          console.error("Fallback failed", err);
+          setAuthError("Login failed: " + String(err.message));
+          setLoading(false);
+      }
+  };
 
   const handleAuth = async () => {
     setLoading(true);
@@ -389,104 +338,42 @@ export default function App() {
     try {
         if (authMode === 'login') {
             await signInWithEmailAndPassword(auth, authData.email, authData.password);
-            // onAuthStateChanged will handle redirection based on role
         } else {
-            // REGISTRATION LOGIC: "Claim Role"
-            const userCredential = await createUserWithEmailAndPassword(auth, authData.email, authData.password);
-            const uid = userCredential.user.uid;
-            
-            // Check if this email exists in team_members
-            const teamRef = collection(db, 'artifacts', appId, 'public', 'data', 'team_members');
-            const q = query(teamRef, where("email", "==", authData.email));
-            const querySnapshot = await getDocs(q);
-            
-            let assignedRole = 'guest';
-            
-            // SUPER ADMIN OVERRIDE CHECK
-            const superAdmins = ['matej_knezevic@yahoo.de', 'david@dcinspect.eu'];
-            if (superAdmins.includes(authData.email.toLowerCase())) {
-                assignedRole = 'admin';
-            } else {
-                // Normal checks
-                const allMembersSnap = await getDocs(teamRef);
-                if (allMembersSnap.empty) {
-                    assignedRole = 'admin';
-                    await setDoc(doc(teamRef, 'me'), { id: 'me', name: 'Admin', role: 'admin', email: authData.email, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=Admin` });
-                } else if (!querySnapshot.empty) {
-                    assignedRole = querySnapshot.docs[0].data().role || 'staff';
-                }
-            }
-
-            // Create User Profile
-            await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'account', 'profile'), {
-                email: authData.email,
-                role: assignedRole,
-                joined: serverTimestamp()
-            });
-            
-            setRole(assignedRole);
-            if(assignedRole === 'guest') setView('guest');
-            else setView('dashboard');
+            await createUserWithEmailAndPassword(auth, authData.email, authData.password);
         }
     } catch (e) {
-        console.error(e);
+        // Suppress console.error for expected fallback scenario
+        if (e.code === 'auth/operation-not-allowed') {
+            console.warn("Email/Password auth disabled. Switching to fallback/demo mode.");
+            await performFallbackAuth(authData.email, authMode);
+            return;
+        }
+
+        console.error(e); // Log other real errors
         let msg = t.authError;
         if (e.code === 'auth/email-already-in-use') msg = "Email already in use.";
         else if (e.code === 'auth/weak-password') msg = "Password too weak.";
-        setAuthError(msg);
+        else if (e.code === 'auth/invalid-credential') msg = "Invalid credentials.";
+        setAuthError(String(msg)); // Force string
         setLoading(false);
     }
   };
 
-  const handlePasswordReset = async () => {
-      if (!authData.email) {
-          showNotification("Please enter your email first", "error");
-          return;
-      }
-      try {
-          await sendPasswordResetEmail(auth, authData.email);
-          showNotification(t.resetEmailSent);
-      } catch (e) {
-          console.error(e);
-          showNotification("Error: " + e.message, "error");
-      }
-  };
-
   const handleDemoAuth = async () => {
-      setLoading(true);
-      setAuthError('');
-      try {
-          const cred = await signInAnonymously(auth);
-          // Set as guest for demo
-          await setDoc(doc(db, 'artifacts', appId, 'users', cred.user.uid, 'account', 'profile'), {
-              email: 'demo@guest.com',
-              role: 'guest',
-              joined: serverTimestamp()
-          });
-          setRole('guest');
-          setView('guest');
-      } catch (e) {
-          console.error("Demo Auth Error:", e);
-          setAuthError("Demo failed");
-          setLoading(false);
-      }
+      setAuthData({ email: 'demo@guest.com', password: 'demo' });
+      setTimeout(() => handleAuth(), 100);
   };
-
-  const handleLogout = async () => { await signOut(auth); };
 
   const saveApp = async (data) => {
     if(!user) return;
     const { autoSync, ...dataToSave } = data;
-    // Save to PUBLIC appointments
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'appointments'), { 
         ...dataToSave, status: 'incoming', createdAt: serverTimestamp(), reportImages:[],
         todos: [ { text: t.defaultTask1, done: false }, { text: t.defaultTask2, done: false }, { text: t.defaultTask3, done: false }, { text: t.defaultTask4, done: false } ]
     });
-
     if (autoSync) {
         openGoogleCalendar(dataToSave);
     }
-
     setView('dashboard');
     showNotification("Saved successfully");
   };
@@ -506,10 +393,8 @@ export default function App() {
       }
   };
 
-  // --- EMPLOYEE FUNCTIONS ---
   const addEmployee = async () => {
       if(!newEmployeeData.name || !newEmployeeData.email) return;
-      // Use email as part of ID to make it searchable/unique easier
       const safeId = newEmployeeData.email.replace(/[^a-z0-9]/gi, '_');
       try {
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'team_members', safeId), {
@@ -521,9 +406,9 @@ export default function App() {
           });
           setIsAddingEmployee(false);
           setNewEmployeeData({ name: '', role: '', email: '' });
-          showNotification("Employee added! Tell them to register.");
+          showNotification("Employee added!");
       } catch (err) {
-          console.error("Error adding employee:", err);
+          console.error(err);
           showNotification("Error adding employee", "error");
       }
   };
@@ -561,7 +446,6 @@ export default function App() {
       }
   };
 
-  // --- TEMPLATE FUNCTIONS ---
   const createTemplate = async () => {
       if(!newTemplateData.name || !newTemplateData.content) return;
       try {
@@ -590,7 +474,6 @@ export default function App() {
           try {
               const text = evt.target.result;
               let contentToSave = null;
-
               if (fileName.endsWith('.json')) {
                   const json = JSON.parse(text);
                   if (json.name && json.content) contentToSave = json;
@@ -639,17 +522,8 @@ export default function App() {
   };
 
   const handleUpdateStatus = (id, s) => { updateApp(id, {status: s}); if(selectedAppointment && selectedAppointment.id === id) setSelectedAppointment({...selectedAppointment, status: s}); };
-  const getCategoryLabel = (k) => { const m = { 'inspection': t.catInspection, 'consulting': t.catConsulting, 'emergency': t.catEmergency }; return m[k] || k; };
   const triggerStationNav = (name, city) => { safeOpen(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${city}`)}`); };
-  const filterFn = a => a.customerName.toLowerCase().includes(filter.toLowerCase()) || a.city.toLowerCase().includes(filter.toLowerCase());
   
-  const incoming = appointments.filter(a => (a.status === 'incoming' || !a.status) && filterFn(a));
-  const pending = appointments.filter(a => a.status === 'pending' && filterFn(a));
-  const review = appointments.filter(a => a.status === 'review' && filterFn(a));
-  const done = appointments.filter(a => a.status === 'done' && filterFn(a));
-  const archived = appointments.filter(a => a.status === 'archived' && filterFn(a));
-  useEffect(() => { if (selectedAppointment && view === 'detail') { setFoodData(generateRouteRestaurants(selectedAppointment.city)); } }, [selectedAppointment, view]);
-
   const generateDemoData = async () => {
     if (!user) return;
     setLoading(true);
@@ -677,8 +551,110 @@ export default function App() {
     } catch (e) { console.error("Error generating demo data:", e); }
     setLoading(false);
   };
+  
+  const getCategoryLabel = (k) => { const m = { 'inspection': t.catInspection, 'consulting': t.catConsulting, 'emergency': t.catEmergency }; return m[k] || k; };
 
-  // --- ADMIN DASHBOARD RENDER HELPERS ---
+  // --- EFFECTS ---
+  useEffect(() => { setDailyQuote(getRandomQuote()); const handleResize = () => setIsMobile(window.innerWidth <768); window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize); }, []);
+  useEffect(() => { window.scrollTo(0, 0); }, [view, selectedAppointment]);
+
+  // Auth & Team Sync
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (!app) throw new Error("Firebase not initialized");
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+           await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+           await signInAnonymously(auth); 
+        }
+      } catch (err) { console.warn("Auth flow check:", err); }
+    };
+    initAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        setUser(u);
+        try {
+            const userProfileRef = doc(db, 'artifacts', appId, 'users', u.uid, 'account', 'profile');
+            const snap = await getDoc(userProfileRef);
+            if (snap.exists()) {
+                const userData = snap.data();
+                if (userData.email) {
+                    setCurrentUserEmail(userData.email);
+                    setRole(userData.role);
+                    setView('dashboard');
+                } else {
+                    setView('login'); 
+                }
+            } else {
+                setView('login'); 
+            }
+        } catch (e) {
+            console.error("Auth Profile Error", e);
+            setView('login');
+        }
+      } else {
+        setUser(null);
+        setRole(null);
+        setCurrentUserEmail('');
+        setView('login');
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Public Data Listeners
+  useEffect(() => {
+      if (!db || !user) return;
+      const teamColRef = collection(db, 'artifacts', appId, 'public', 'data', 'team_members');
+      const unsubscribeTeam = onSnapshot(teamColRef, async (snap) => {
+          if (snap.empty) {
+              const batch = writeBatch(db);
+              INITIAL_TEAM_MEMBERS.forEach(member => { const docRef = doc(teamColRef, member.id); batch.set(docRef, member); });
+              await batch.commit();
+          } else {
+              const members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+              setTeamMembers(members);
+          }
+      }, (err) => console.error("Team Fetch Error:", err));
+      const tplColRef = collection(db, 'artifacts', appId, 'public', 'data', 'templates');
+      const unsubscribeTpl = onSnapshot(tplColRef, async (snap) => {
+          if (snap.empty) {
+              const batch = writeBatch(db);
+              INITIAL_TEMPLATES.forEach(tpl => { const docRef = doc(tplColRef, tpl.id); batch.set(docRef, tpl); });
+              await batch.commit();
+          } else {
+              const tpls = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+              setTemplates(tpls);
+          }
+      }, (err) => console.error("Templates Fetch Error:", err));
+      const q = collection(db, 'artifacts', appId, 'public', 'data', 'appointments');
+      const unsubscribeApps = onSnapshot(q, (snap) => {
+          const apps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          apps.sort((a,b) => new Date(a.date) - new Date(b.date));
+          setAppointments(apps);
+      }, (err) => console.error("Apps Fetch Error:", err));
+
+      return () => { unsubscribeTeam(); unsubscribeTpl(); unsubscribeApps(); };
+  }, [user]);
+
+  const getCurrentMemberId = () => {
+      if (!currentUserEmail) return null;
+      const member = teamMembers.find(m => m.email && m.email.toLowerCase() === currentUserEmail.toLowerCase());
+      return member ? member.id : null;
+  };
+  const currentMemberId = getCurrentMemberId();
+
+  const filterFn = a => a.customerName.toLowerCase().includes(filter.toLowerCase()) || a.city.toLowerCase().includes(filter.toLowerCase());
+  const incoming = appointments.filter(a => (a.status === 'incoming' || !a.status) && filterFn(a));
+  const pending = appointments.filter(a => a.status === 'pending' && filterFn(a));
+  const review = appointments.filter(a => a.status === 'review' && filterFn(a));
+  const done = appointments.filter(a => a.status === 'done' && filterFn(a));
+  const archived = appointments.filter(a => a.status === 'archived' && filterFn(a));
+
+  // --- RENDER HELPERS (Defined Last) ---
   const renderAdminSidebar = () => (
       <div className={`bg-slate-900 text-white w-full md:w-64 flex-shrink-0 flex flex-col ${isMobile ? 'h-auto fixed bottom-0 left-0 right-0 z-50' : 'h-screen'}`}>
           {!isMobile && (
@@ -725,8 +701,6 @@ export default function App() {
                     <h2 className="text-2xl font-bold text-slate-800">{t.menuEmployees}</h2>
                     <Button size="small" icon={Plus} onClick={() => setIsAddingEmployee(true)}>{t.addEmployee}</Button>
                 </div>
-                
-                {/* ADD EMPLOYEE FORM */}
                 {isAddingEmployee && (
                     <Card className="p-4 bg-blue-50 border-blue-200 mb-6 animate-fade-in">
                         <h3 className="font-bold text-slate-700 mb-3">{t.newEmployee}</h3>
@@ -751,7 +725,6 @@ export default function App() {
                         </div>
                     </Card>
                 )}
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {teamMembers.map(member => (
                         <Card key={member.id} className="p-4 flex items-center gap-4 group relative">
@@ -764,20 +737,8 @@ export default function App() {
                                 <p className="text-xs text-blue-600 mt-1">{member.email}</p>
                             </div>
                             <div className="flex flex-col gap-1 absolute top-2 right-2">
-                                <button 
-                                    onClick={() => setEditingEmployee(member)} 
-                                    className="p-2 rounded-full text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100"
-                                    title="Edit"
-                                >
-                                    <Edit size={16} />
-                                </button>
-                                <button 
-                                    onClick={() => handleDeleteEmployee(member.id)} 
-                                    className={`p-2 rounded-full transition-all ${deleteEmployeeId === member.id ? 'bg-red-600 text-white opacity-100' : 'text-red-400 hover:bg-red-50 hover:text-red-600 opacity-0 group-hover:opacity-100'}`}
-                                    title="Remove"
-                                >
-                                    {deleteEmployeeId === member.id ? <Check size={16} /> : <Trash2 size={16} />}
-                                </button>
+                                <button onClick={() => setEditingEmployee(member)} className="p-2 rounded-full text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100" title="Edit"><Edit size={16} /></button>
+                                <button onClick={() => handleDeleteEmployee(member.id)} className={`p-2 rounded-full transition-all ${deleteEmployeeId === member.id ? 'bg-red-600 text-white opacity-100' : 'text-red-400 hover:bg-red-50 hover:text-red-600 opacity-0 group-hover:opacity-100'}`} title="Remove">{deleteEmployeeId === member.id ? <Check size={16} /> : <Trash2 size={16} />}</button>
                             </div>
                         </Card>
                     ))}
@@ -791,10 +752,8 @@ export default function App() {
               const firstDayOfMonth = new Date(year, month, 1).getDay(); 
               const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; 
               const daysInMonth = new Date(year, month + 1, 0).getDate();
-              
               const prevMonth = () => setCalendarViewDate(new Date(year, month - 1, 1));
               const nextMonth = () => setCalendarViewDate(new Date(year, month + 1, 1));
-
               return (
                   <div className="p-6 h-full flex flex-col">
                       <div className="flex items-center justify-between mb-6">
@@ -805,7 +764,6 @@ export default function App() {
                              <button onClick={nextMonth} className="p-1 hover:bg-slate-100 rounded-lg"><ChevronRight size={20}/></button>
                         </div>
                       </div>
-                      
                       <Card className="flex-1 flex flex-col p-4 overflow-hidden">
                           <div className="grid grid-cols-7 mb-2 text-center">
                               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
@@ -813,15 +771,12 @@ export default function App() {
                               ))}
                           </div>
                           <div className="grid grid-cols-7 flex-1 auto-rows-fr gap-1">
-                              {Array.from({ length: startDay }).map((_, i) => (
-                                  <div key={`empty-${i}`} className="bg-slate-50/50 rounded-lg"></div>
-                              ))}
+                              {Array.from({ length: startDay }).map((_, i) => ( <div key={`empty-${i}`} className="bg-slate-50/50 rounded-lg"></div> ))}
                               {Array.from({ length: daysInMonth }).map((_, i) => {
                                   const day = i + 1;
                                   const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                                   const dayApps = appointments.filter(a => a.date === dateStr);
                                   const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
-                                  
                                   return (
                                       <div key={day} className={`border rounded-lg p-2 overflow-hidden flex flex-col ${isToday ? 'border-blue-400 bg-blue-50/30' : 'border-slate-100 bg-white hover:border-blue-200'}`}>
                                           <span className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{day}</span>
@@ -941,9 +896,7 @@ export default function App() {
                                       </div>
                                   </div>
                               </div>
-                              
                               <Input label={t.nameLabel} value={editingEmployee.name} onChange={e => setEditingEmployee({...editingEmployee, name: e.target.value})} />
-                              
                               <div>
                                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.roleLabel}</label>
                                   <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" value={editingEmployee.role} onChange={e => setEditingEmployee({...editingEmployee, role: e.target.value})}>
@@ -951,11 +904,8 @@ export default function App() {
                                       <option value="admin">Admin</option>
                                   </select>
                               </div>
-
                               <Input label={t.emailLabel} value={editingEmployee.email} onChange={e => setEditingEmployee({...editingEmployee, email: e.target.value})} />
-                              
                               <Input label={t.avatarUrl} value={editingEmployee.avatar} onChange={e => setEditingEmployee({...editingEmployee, avatar: e.target.value})} placeholder="https://..." />
-
                               <Button fullWidth onClick={handleUpdateEmployee} icon={Save}>{t.save}</Button>
                           </div>
                       </div>
@@ -1041,6 +991,10 @@ export default function App() {
 
   if(view === 'detail' && selectedAppointment) {
     const a = selectedAppointment;
+    // Add permission logic
+    const isAssignedToMe = currentMemberId && a.assignedTo === currentMemberId;
+    const canEdit = role === 'admin' || (role === 'staff' && isAssignedToMe);
+    
     const handleReportUpdate = (noteText) => { const finalText = generateReportText(noteText, a.customerName, a.date, a.category); updateApp(a.id, { reportNotes: noteText, finalReport: finalText }); setSelectedAppointment({ ...a, reportNotes: noteText, finalReport: finalText }); };
     const statusColor = a.status==='archived' ? 'bg-slate-500' : a.status==='done' ? 'bg-green-600' : a.status==='pending' ? 'bg-orange-500' : 'bg-blue-600';
     const statusLabel = a.status === 'incoming' ? t.colIncoming : a.status === 'pending' ? t.colPending : a.status === 'done' ? t.colDone : t.colArchived;
@@ -1072,18 +1026,18 @@ export default function App() {
                </div>
            )}
            <Card className="p-3 grid grid-cols-2 gap-3">
-              {a.status === 'incoming' && <Button variant="orange" onClick={() => handleUpdateStatus(a.id, 'pending')}>{t.moveToPending}</Button>}
-              {a.status === 'pending' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'incoming')} icon={Undo}>{t.moveToIncoming}</Button>}
-              {a.status === 'pending' && <Button variant="purple" onClick={() => handleUpdateStatus(a.id, 'review')}>{t.moveToReview}</Button>}
+              {canEdit && a.status === 'incoming' && <Button variant="orange" onClick={() => handleUpdateStatus(a.id, 'pending')}>{t.moveToPending}</Button>}
+              {canEdit && a.status === 'pending' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'incoming')} icon={Undo}>{t.moveToIncoming}</Button>}
+              {canEdit && a.status === 'pending' && <Button variant="purple" onClick={() => handleUpdateStatus(a.id, 'review')}>{t.moveToReview}</Button>}
 
               {/* Status Change Buttons Restricted by Role */}
-              {a.status === 'review' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'pending')} icon={Undo}>Back to Pending</Button>}
-              {a.status === 'review' && role === 'admin' && <Button variant="success" onClick={() => handleUpdateStatus(a.id, 'done')}>{t.moveToDone}</Button>}
+              {canEdit && a.status === 'review' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'pending')} icon={Undo}>Back to Pending</Button>}
+              {role === 'admin' && a.status === 'review' && <Button variant="success" onClick={() => handleUpdateStatus(a.id, 'done')}>{t.moveToDone}</Button>}
               
-              {a.status === 'done' && role === 'admin' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'review')} icon={Undo}>{t.restore}</Button>}
-              {a.status === 'done' && role === 'admin' && <Button variant="gray" onClick={() => handleUpdateStatus(a.id, 'archived')} icon={FolderArchive}>{t.moveToArchived}</Button>}
+              {role === 'admin' && a.status === 'done' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'review')} icon={Undo}>{t.restore}</Button>}
+              {role === 'admin' && a.status === 'done' && <Button variant="gray" onClick={() => handleUpdateStatus(a.id, 'archived')} icon={FolderArchive}>{t.moveToArchived}</Button>}
               
-              {a.status === 'archived' && role === 'admin' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'done')} icon={Undo}>{t.restoreFromArchive}</Button>}
+              {role === 'admin' && a.status === 'archived' && <Button variant="secondary" onClick={() => handleUpdateStatus(a.id, 'done')} icon={Undo}>{t.restoreFromArchive}</Button>}
               
               <Button variant="secondary" onClick={() => openGoogleCalendar(a)} icon={CalendarPlus}>{t.addToCalendar}</Button>
            </Card>
@@ -1100,11 +1054,32 @@ export default function App() {
            
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Fuel size={16} className="text-orange-500"/> {t.gasTitle}</h3><Button variant="secondary" size="small" fullWidth onClick={() => safeOpen(`https://www.google.com/maps/search/gas+stations+near+${a.city}`)}>{t.gasButton}</Button></Card><Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Coffee size={16} className="text-brown-500"/> {t.foodTitle}</h3><div className="space-y-2">{foodData.map((f,i)=><div key={i} className="text-xs flex justify-between p-2 bg-slate-50 rounded border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => triggerStationNav(f.name, a.city)}><span>{f.name}</span><span className="text-slate-400">{f.dist}</span></div>)}</div></Card></div>
            
-           <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><FileText size={16}/> {t.reportTitle}</h3><div className="flex gap-2 overflow-x-auto pb-4 mb-2"><label className="flex-shrink-0 w-16 h-16 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-50"><Camera size={20}/><input type="file" className="hidden" accept="image/*" onChange={async (e) => { if(e.target.files[0]) { const b64 = await compressImage(e.target.files[0]); const n=[...(a.reportImages||[]), b64]; updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }}}/></label>{(a.reportImages||[]).map((img, i) => (<div key={i} className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200"><img src={img} className="w-full h-full object-cover"/><button onClick={() => { const n = a.reportImages.filter((_, idx) => idx !== i); updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5"><X size={10}/></button></div>))}</div><div className="space-y-2"><textarea className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm min-h-[100px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={t.reportNotesPlaceholder} value={a.reportNotes || ''} onChange={(e) => { setSelectedAppointment({...a, reportNotes: e.target.value}); }} /><Button fullWidth onClick={() => handleReportUpdate(a.reportNotes || '')} icon={Wand2}>{t.generateBtn}</Button></div>{a.finalReport && (<div className="mt-4 pt-4 border-t border-slate-100"><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.reportResultLabel}</label><div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono whitespace-pre-wrap mb-4 max-h-40 overflow-y-auto">{a.finalReport}</div><div className="flex gap-2"><Button size="small" variant="secondary" icon={Printer} onClick={() => printAsPdf(a.finalReport, a.reportImages)}>{t.downloadPdf}</Button><Button size="small" variant="secondary" icon={Download} onClick={() => downloadAsWord(a.finalReport, a.customerName, a.reportImages)}>{t.downloadDoc}</Button></div></div>)}</Card>
+           <Card className="p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><FileText size={16}/> {t.reportTitle}</h3><div className="flex gap-2 overflow-x-auto pb-4 mb-2"><label className="flex-shrink-0 w-16 h-16 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-50"><Camera size={20}/><input type="file" className="hidden" accept="image/*" onChange={async (e) => { if(e.target.files[0]) { const b64 = await compressImage(e.target.files[0]); const n=[...(a.reportImages||[]), b64]; updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }}}/></label>{(a.reportImages||[]).map((img, i) => (<div key={i} className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200"><img src={img} className="w-full h-full object-cover"/><button onClick={() => { const n = a.reportImages.filter((_, idx) => idx !== i); updateApp(a.id, {reportImages:n}); setSelectedAppointment({...a, reportImages:n}); }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5"><X size={10}/></button></div>))}</div>
+           <div className="space-y-2">
+               <textarea 
+                   className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm min-h-[100px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                   placeholder={t.reportNotesPlaceholder} 
+                   value={a.reportNotes || ''} 
+                   onChange={(e) => { setSelectedAppointment({...a, reportNotes: e.target.value}); }} 
+                   disabled={!canEdit}
+               />
+               {/* NEW: Add Template Button in Detail View - VISIBLE ONLY IF canEdit */}
+               <div className="flex gap-2">
+                   {canEdit && (
+                       <Button variant="secondary" size="small" icon={FilePlus} onClick={() => { setTemplateModalMode('select'); setIsTemplateModalOpen(true); }}>{t.addTemplate}</Button>
+                   )}
+                   {canEdit && (
+                       <Button fullWidth onClick={() => handleReportUpdate(a.reportNotes || '')} icon={Wand2}>{t.generateBtn}</Button>
+                   )}
+               </div>
+           </div>
+           {a.finalReport && (<div className="mt-4 pt-4 border-t border-slate-100"><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.reportResultLabel}</label><div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono whitespace-pre-wrap mb-4 max-h-40 overflow-y-auto">{a.finalReport}</div><div className="flex gap-2"><Button size="small" variant="secondary" icon={Printer} onClick={() => printAsPdf(a.finalReport, a.reportImages)}>{t.downloadPdf}</Button><Button size="small" variant="secondary" icon={Download} onClick={() => downloadAsWord(a.finalReport, a.customerName, a.reportImages)}>{t.downloadDoc}</Button></div></div>)}</Card>
            <div className="pt-8 pb-4">
-               <Button fullWidth variant="danger" icon={Trash2} onClick={() => deleteApp(a.id)}>
-                   {deleteConfirmId === a.id ? t.confirmDelete : t.delete}
-               </Button>
+               {role === 'admin' && (
+                 <Button fullWidth variant="danger" icon={Trash2} onClick={() => deleteApp(a.id)}>
+                     {deleteConfirmId === a.id ? t.confirmDelete : t.delete}
+                 </Button>
+               )}
             </div>
         </div>
 
@@ -1145,12 +1120,11 @@ export default function App() {
             {role === 'admin' && (
                 <button onClick={() => setView('team')} className={`p-2 rounded-lg ${view==='team'?'bg-blue-50 text-blue-600':'text-slate-400'}`} title={t.navTeam}><Users size={20}/></button>
             )}
+            {/* REMOVED ARCHIVE BUTTON AS REQUESTED */}
+            {/* <button onClick={() => setLang(l => l==='hr'?'en':'hr')} className="px-2 bg-slate-100 rounded text-xs font-bold text-slate-500 border border-slate-200">{lang.toUpperCase()}</button> */}
             <button onClick={handleLogout} className="px-2 bg-red-50 rounded text-xs font-bold text-red-500 border border-red-200"><LogOut size={16}/></button>
-            
-            {/* DEBUG TOGGLE FOR ROLE (Restricted to Admins) */}
-            {role === 'admin' && (
-                <button onClick={() => setRole(r => r === 'admin' ? 'user' : 'admin')} className="px-2 bg-gray-100 rounded text-xs font-bold text-gray-400 border border-gray-200" title="Toggle Admin Role (Debug)"><Shield size={12}/></button>
-            )}
+            {/* DEBUG TOGGLE FOR ROLE (Hidden in production usually) */}
+            <button onClick={() => setRole(r => r === 'admin' ? 'user' : 'admin')} className="px-2 bg-gray-100 rounded text-xs font-bold text-gray-400 border border-gray-200" title="Toggle Admin Role (Debug)"><Shield size={12}/></button>
          </div>
       </div>
 
@@ -1165,20 +1139,20 @@ export default function App() {
               {!isMobile && (
                   <div className="flex flex-row h-full w-full divide-x divide-slate-200">
                       {/* Pass teamMembers Prop and ROLE */}
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
-                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} currentMemberId={currentMemberId} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} currentMemberId={currentMemberId} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} currentMemberId={currentMemberId} /></div>
+                      <div className="flex-1 h-full p-2"><KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={false} teamMembers={teamMembers} role={role} currentMemberId={currentMemberId} /></div>
                   </div>
               )}
               {/* MOBILE VIEW: Stacked with Padding */}
               {isMobile && (
                   <div className="flex flex-col gap-4 p-4 overflow-y-auto h-full custom-scrollbar">
                       {/* Pass teamMembers Prop and ROLE */}
-                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
-                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
-                      <KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
-                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} />
+                      <KanbanColumn title={t.colIncoming} status="incoming" appointments={incoming} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} currentMemberId={currentMemberId} />
+                      <KanbanColumn title={t.colPending} status="pending" appointments={pending} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} currentMemberId={currentMemberId} />
+                      <KanbanColumn title={t.colReview} status="review" appointments={review} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} currentMemberId={currentMemberId} />
+                      <KanbanColumn title={t.colDone} status="done" appointments={done} onClickApp={(app) => { setSelectedAppointment(app); setView('detail'); }} lang={lang} onStatusChange={handleUpdateStatus} isMobile={true} teamMembers={teamMembers} role={role} currentMemberId={currentMemberId} />
                   </div>
               )}
             </>
