@@ -10,7 +10,7 @@ import {
   Shield, Settings, FileBox, Copy, Upload, CloudLightning, Database, Info,
   ChevronLeft, ChevronRight, FilePlus, UserX, KeyRound, Edit, User,
   Link as LinkIcon, Menu, XCircle, Phone, Folder, File, ChevronRight as ChevronRightIcon,
-  Bold, Italic, List, AlignLeft, Image as PhotoIcon, ChevronDown
+  Bold, Italic, Underline, List, AlignLeft, AlignCenter, AlignRight, Image as PhotoIcon, ChevronDown, Type
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { 
@@ -72,7 +72,6 @@ const INITIAL_TEAM_MEMBERS = [
   { id: 'max', name: 'Max Mustermann', role: 'staff', email: 'max@dc-inspect.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
 ];
 
-// NEW STRUCTURED TEMPLATE DATA BASED ON SCREENSHOT
 const INITIAL_TEMPLATES = [
     { 
         id: 't1', 
@@ -85,45 +84,48 @@ const INITIAL_TEMPLATES = [
                 id: 'cat1',
                 name: 'INFORMACIJE O KLIJENTU I INSPEKCIJI',
                 items: [
-                    { id: 'item1', title: 'Informacije o klijentu i inspekciji', content: '' }
+                    { id: 'item1', title: 'Informacije o klijentu i inspekciji', content: '<p>Standardna inspekcija...</p>', photos: [] }
                 ]
             },
             {
                 id: 'cat2',
                 name: 'RAZGOVOR SA KLIJENTOM',
                 items: [
-                    { id: 'item2', title: 'Razgovor sa Klijentom', content: '' }
+                    { id: 'item2', title: 'Razgovor sa Klijentom', content: '', photos: [] }
                 ]
             },
             {
                 id: 'cat3',
                 name: 'INSPEKCIJE UZROK VLAGE',
                 items: [
-                    { id: 'item3', title: 'Inspekcija Uzrok Vlage', content: '' }
+                    { id: 'item3', title: 'Leaking Terrace', group: 'Terassa / Balkon', content: '<p>We note the terrace/balcony was inspected and evidence suggests there is leaking to certain areas...</p>', photos: [] },
+                    { id: 'item4', title: 'Inadequate fall to drainage', group: 'Terassa / Balkon', content: '', photos: [] },
+                    { id: 'item5', title: 'Efflorescence visible', group: 'Terassa / Balkon', content: '', photos: [] },
+                    { id: 'item6', title: 'Kapilarna Vlaga', group: 'Ostalo', content: '', photos: [] }
                 ]
             },
             {
                 id: 'cat4',
                 name: 'ZAKLJUČAK',
                 items: [
-                    { id: 'item4', title: 'Stanje pregledane strukture', content: '' }
+                    { id: 'item7', title: 'Stanje pregledane strukture', content: '', group: 'General' }
                 ]
             },
             {
                 id: 'cat5',
                 name: 'INFORMACIJE O IMOVINI I INSPEKCIJI',
                 items: [
-                    { id: 'item5a', title: 'Vrijeme na području inspekcije', content: '' },
-                    { id: 'item5b', title: 'Podaci o nekretnini', content: '' },
-                    { id: 'item5c', title: 'Pristup i ograničenja', content: '' },
-                    { id: 'item5d', title: 'Status komunalnih usluga', content: '' }
+                    { id: 'item8', title: 'Vrijeme na području inspekcije', content: '', group: 'General' },
+                    { id: 'item9', title: 'Podaci o nekretnini', content: '', group: 'General' },
+                    { id: 'item10', title: 'Pristup i ograničenja', content: '', group: 'General' },
+                    { id: 'item11', title: 'Status komunalnih usluga', content: '', group: 'General' }
                 ]
             },
             {
                 id: 'cat6',
                 name: 'UVJETI I ODREDBE',
                 items: [
-                    { id: 'item6', title: 'NOTE', content: '' }
+                    { id: 'item12', title: 'NOTE', content: '', group: 'General' }
                 ]
             }
         ]
@@ -230,56 +232,132 @@ const Toast = ({ message, type, onClose }) => {
 const Input = ({label, type="text", ...p}) => (<div className="mb-3"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label><input type={type} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" {...p}/></div>);
 const Select = ({ label, options, ...props }) => ( <div className="mb-4"> <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label> <select className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-900" {...props}> {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)} </select> </div> );
 
+// --- 3.5 RICH TEXT EDITOR COMPONENT (FIXED CURSOR) ---
+const RichTextEditor = ({ value, onChange, placeholder }) => {
+    const editorRef = useRef(null);
+    const contentRef = useRef(value || '');
+
+    useEffect(() => {
+        if (editorRef.current && value !== editorRef.current.innerHTML) {
+             if (value !== contentRef.current) {
+                 editorRef.current.innerHTML = value || '';
+                 contentRef.current = value || '';
+             }
+        }
+    }, [value]);
+
+    const exec = (command, val = null) => {
+        document.execCommand(command, false, val);
+        if (editorRef.current) editorRef.current.focus();
+    };
+
+    const handleInput = (e) => {
+        const newHtml = e.currentTarget.innerHTML;
+        contentRef.current = newHtml;
+        onChange(newHtml);
+    };
+
+    return (
+        <div className="flex flex-col h-full border border-slate-200 rounded-lg overflow-hidden bg-white">
+            <div className="flex flex-wrap gap-1 p-2 bg-slate-50 border-b border-slate-200">
+                <button onMouseDown={(e) => { e.preventDefault(); exec('bold'); }} className="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Bold"><Bold size={16}/></button>
+                <button onMouseDown={(e) => { e.preventDefault(); exec('italic'); }} className="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Italic"><Italic size={16}/></button>
+                <button onMouseDown={(e) => { e.preventDefault(); exec('underline'); }} className="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Underline"><Underline size={16}/></button>
+                <div className="w-px h-6 bg-slate-300 mx-1 self-center"></div>
+                <button onMouseDown={(e) => { e.preventDefault(); exec('insertUnorderedList'); }} className="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="List"><List size={16}/></button>
+                <div className="w-px h-6 bg-slate-300 mx-1 self-center"></div>
+                <button onMouseDown={(e) => { e.preventDefault(); exec('justifyLeft'); }} className="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Align Left"><AlignLeft size={16}/></button>
+                <button onMouseDown={(e) => { e.preventDefault(); exec('justifyCenter'); }} className="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Align Center"><AlignCenter size={16}/></button>
+                <button onMouseDown={(e) => { e.preventDefault(); exec('justifyRight'); }} className="p-1.5 hover:bg-slate-200 rounded text-slate-600" title="Align Right"><AlignRight size={16}/></button>
+            </div>
+            <div 
+                className="flex-1 p-4 outline-none overflow-y-auto text-sm text-slate-700 leading-relaxed font-sans text-left" 
+                contentEditable
+                dir="ltr"
+                ref={editorRef}
+                onInput={handleInput}
+                style={{ minHeight: '150px' }}
+            />
+        </div>
+    );
+};
+
+
 // --- 4. ISOLATED COMPONENT: TEMPLATE MANAGER ---
-const TemplateManager = ({ mode = 'admin', templates, onCreate, onUpdate, onDelete, onSelect, onClose }) => {
+const TemplateManager = ({ mode = 'admin', templates, onCreate, onUpdate, onDelete, onSelect, onClose, isMobile }) => {
     const [view, setView] = useState('list'); 
-    const [filterCat, setFilterCat] = useState('All');
     const [newTpl, setNewTpl] = useState({ name: '', category: 'General', content: '', sourceUrl: '' });
     
-    // Derived state
+    // Designer State
+    const [activeCategoryId, setActiveCategoryId] = useState(null);
+    const [activeItemId, setActiveItemId] = useState(null);
+    const [editedTpl, setEditedTpl] = useState(null);
+    const [currentTpl, setCurrentTpl] = useState(null);
+    const [reorderMode, setReorderMode] = useState(false);
+
+    const fileInputRef = useRef(null);
+
+    // Derived state for list view
     const categories = ['All', ...new Set(templates.map(t => t.category || 'General'))];
+    
+    const [filterCat, setFilterCat] = useState('All'); 
+    
     const filteredTemplates = filterCat === 'All' 
         ? templates 
         : templates.filter(t => (t.category || 'General') === filterCat);
 
-    // Designer State
-    const [activeCategoryId, setActiveCategoryId] = useState(null);
-    const [activeItemId, setActiveItemId] = useState(null);
-    
-    // If we're editing a template, we work on a local copy
-    const [editedTpl, setEditedTpl] = useState(null);
-    const [currentTpl, setCurrentTpl] = useState(null); // Used to trigger effect
 
     useEffect(() => {
         if (currentTpl) {
-            setEditedTpl(JSON.parse(JSON.stringify(currentTpl))); // Deep copy
-            if (currentTpl.structure && currentTpl.structure.length > 0) {
-                setActiveCategoryId(currentTpl.structure[0].id);
-                if (currentTpl.structure[0].items.length > 0) {
-                    setActiveItemId(currentTpl.structure[0].items[0].id);
+            const copy = JSON.parse(JSON.stringify(currentTpl));
+            // Ensure structure exists
+            if (!copy.structure) copy.structure = [];
+            setEditedTpl(copy);
+            if (copy.structure.length > 0) {
+                setActiveCategoryId(copy.structure[0].id);
+                if (copy.structure[0].items.length > 0) {
+                    setActiveItemId(copy.structure[0].items[0].id);
                 }
             }
         }
     }, [currentTpl]);
 
+    // MOBILE NAVIGATION LOGIC
+    const mobileLevel = !activeCategoryId ? 0 : (!activeItemId ? 1 : 2);
+    
+    const handleMobileBack = () => {
+        if (activeItemId) setActiveItemId(null);
+        else if (activeCategoryId) setActiveCategoryId(null);
+        else setView('list');
+    };
+
     const activeCategory = editedTpl?.structure?.find(c => c.id === activeCategoryId);
     const activeItem = activeCategory?.items?.find(i => i.id === activeItemId);
 
+    // Group items by 'group' property for display
+    const groupedItems = activeCategory?.items?.reduce((acc, item) => {
+        const groupName = item.group || 'General';
+        if (!acc[groupName]) acc[groupName] = [];
+        acc[groupName].push(item);
+        return acc;
+    }, {}) || {};
+
+
     const handleOpenDesigner = (tpl) => {
-        // Use provided template or create structure for new one
         const base = tpl || { 
             name: 'New Template', 
             structure: [
-                { id: 'c1', name: 'New Category', items: [{ id: 'i1', title: 'New Item', content: '' }] }
+                { id: crypto.randomUUID(), name: 'General Information', items: [{ id: crypto.randomUUID(), title: 'Overview', group:'General', content: '', selected: false, complete: false, major: false, minor: false, photos: [] }] }
             ] 
         };
         setCurrentTpl(base);
         setView('designer');
+        setActiveCategoryId(null); 
+        setActiveItemId(null);
     };
 
     const handleSave = () => {
         if (!editedTpl) return;
-        
         if (editedTpl.id) {
             onUpdate(editedTpl.id, editedTpl);
         } else {
@@ -288,125 +366,314 @@ const TemplateManager = ({ mode = 'admin', templates, onCreate, onUpdate, onDele
         setView('list');
     };
 
-    const updateItemContent = (text) => {
+    const updateItemContent = (htmlContent) => {
         if (!editedTpl || !activeCategory || !activeItem) return;
-        
         const newTpl = { ...editedTpl };
         const cat = newTpl.structure.find(c => c.id === activeCategoryId);
         const item = cat.items.find(i => i.id === activeItemId);
-        item.content = text;
+        item.content = htmlContent;
         setEditedTpl(newTpl);
     };
 
-    // RENDER: DESIGNER VIEW (3-Column Layout)
+    const updateItemProp = (prop, value) => {
+        if (!editedTpl || !activeCategory || !activeItem) return;
+        const newTpl = { ...editedTpl };
+        const cat = newTpl.structure.find(c => c.id === activeCategoryId);
+        const item = cat.items.find(i => i.id === activeItemId);
+        item[prop] = value;
+        setEditedTpl(newTpl);
+    }
+
+    const handlePhotoUpload = async (e) => {
+        if (!e.target.files[0] || !activeItem) return;
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const b64 = evt.target.result;
+            const newTpl = { ...editedTpl };
+            const cat = newTpl.structure.find(c => c.id === activeCategoryId);
+            const item = cat.items.find(i => i.id === activeItemId);
+            if(!item.photos) item.photos = [];
+            item.photos.push(b64);
+            setEditedTpl(newTpl);
+        };
+        reader.readAsDataURL(file);
+        e.target.value = null; 
+    };
+
+    const handlePhotoDelete = (index) => {
+        const newTpl = { ...editedTpl };
+        const cat = newTpl.structure.find(c => c.id === activeCategoryId);
+        const item = cat.items.find(i => i.id === activeItemId);
+        item.photos.splice(index, 1);
+        setEditedTpl(newTpl);
+    };
+
+    const handlePhotoMove = (index, direction) => {
+        const newTpl = { ...editedTpl };
+        const cat = newTpl.structure.find(c => c.id === activeCategoryId);
+        const item = cat.items.find(i => i.id === activeItemId);
+        const photos = item.photos;
+        
+        if (direction === -1 && index > 0) {
+            [photos[index], photos[index - 1]] = [photos[index - 1], photos[index]];
+        } else if (direction === 1 && index < photos.length - 1) {
+            [photos[index], photos[index + 1]] = [photos[index + 1], photos[index]];
+        }
+        setEditedTpl(newTpl);
+    };
+
+
+    const handleAddCategory = () => {
+        const newCatId = crypto.randomUUID();
+        const newTpl = { ...editedTpl };
+        newTpl.structure.push({
+            id: newCatId,
+            name: 'New Category',
+            items: [{ id: crypto.randomUUID(), title: 'New Item', group: 'General', content: '', selected: false, complete: false, major: false, minor: false, photos: [] }]
+        });
+        setEditedTpl(newTpl);
+        setActiveCategoryId(newCatId); 
+        if(isMobile) setActiveItemId(null); 
+    };
+
+    const handleAddItem = () => {
+        if (!activeCategory) return;
+        const newTpl = { ...editedTpl };
+        const cat = newTpl.structure.find(c => c.id === activeCategoryId);
+        const newItemId = crypto.randomUUID();
+        cat.items.push({ id: newItemId, title: 'New Item', group: 'General', content: '', selected: false, complete: false, major: false, minor: false, photos: [] });
+        setEditedTpl(newTpl);
+        setActiveItemId(newItemId); 
+    };
+
+    const handleDeleteItem = (catId, itemId) => {
+        const newTpl = { ...editedTpl };
+        const cat = newTpl.structure.find(c => c.id === catId);
+        cat.items = cat.items.filter(i => i.id !== itemId);
+        setEditedTpl(newTpl);
+        if(isMobile && activeItemId === itemId) setActiveItemId(null); 
+    };
+
+    const handleDeleteCategory = (catId) => {
+        const newTpl = { ...editedTpl };
+        newTpl.structure = newTpl.structure.filter(c => c.id !== catId);
+        setEditedTpl(newTpl);
+        if(isMobile && activeCategoryId === catId) setActiveCategoryId(null);
+    };
+
+    // RENDER: DESIGNER VIEW (Responsive Stack)
     if (view === 'designer' && editedTpl) {
         return (
-            <div className="flex flex-col h-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 fixed inset-4 z-[200]">
+            <div className="flex flex-col h-full bg-white rounded-none md:rounded-2xl shadow-xl overflow-hidden border-0 md:border border-slate-200 fixed inset-0 md:inset-4 z-[200]">
                 {/* Header Toolbar */}
                 <div className="bg-slate-800 text-white px-4 py-3 flex justify-between items-center shadow-md flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        {/* Editable Title */}
-                        <input 
-                            className="bg-transparent font-bold text-lg border-b border-transparent hover:border-slate-500 focus:border-white outline-none text-white w-64"
-                            value={editedTpl.name}
-                            onChange={(e) => setEditedTpl({...editedTpl, name: e.target.value})}
-                        />
-                        <span className="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">Draft</span>
+                    <div className="flex items-center gap-3 w-full">
+                        {isMobile && (
+                            <button onClick={handleMobileBack} className="mr-2 p-1 rounded-full hover:bg-slate-700">
+                                <ArrowLeftIcon size={20}/>
+                            </button>
+                        )}
+                        
+                        {!isMobile || mobileLevel === 0 ? (
+                            <div className="flex flex-col">
+                                <input 
+                                    className="bg-transparent font-bold text-lg border-b border-transparent hover:border-slate-500 focus:border-white outline-none text-white w-full md:w-64"
+                                    value={editedTpl.name || ''}
+                                    onChange={(e) => setEditedTpl({...editedTpl, name: e.target.value})}
+                                />
+                                <span className="text-xs text-slate-400">Template Name</span>
+                            </div>
+                        ) : (
+                            <span className="font-bold truncate">
+                                {mobileLevel === 1 ? activeCategory?.name : activeItem?.title || 'Edit Item'}
+                            </span>
+                        )}
                     </div>
-                    <div className="flex gap-2">
-                         <button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2"><Save size={14}/> Save & Close</button>
-                        <div className="w-px h-6 bg-slate-600 mx-1"></div>
-                        <button onClick={() => setView('list')} className="bg-red-600 hover:bg-red-700 px-4 py-1.5 rounded text-xs font-bold text-white">Close</button>
-                    </div>
+                    
+                    {!isMobile && (
+                        <div className="flex gap-2">
+                             <button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2"><Save size={14}/> Save</button>
+                            <div className="w-px h-6 bg-slate-600 mx-1"></div>
+                            <button onClick={() => setView('list')} className="bg-red-600 hover:bg-red-700 px-4 py-1.5 rounded text-xs font-bold text-white">Close</button>
+                        </div>
+                    )}
+                    {isMobile && (
+                        <button onClick={handleSave} className="text-green-400 font-bold ml-2">Save</button>
+                    )}
                 </div>
 
-                {/* Main 3-Column Content */}
-                <div className="flex flex-1 overflow-hidden">
+                {/* Main Content Area (Responsive Stack) */}
+                <div className="flex flex-1 overflow-hidden relative">
                     
-                    {/* COL 1: Categories (Blue Sidebar - Changed from Red) */}
-                    <div className="w-72 bg-[#0F172A] text-white flex flex-col flex-shrink-0 overflow-y-auto">
+                    {/* COL 1: Categories */}
+                    <div className={`flex-col flex-shrink-0 overflow-y-auto border-r border-slate-700 bg-[#0F172A] text-white w-full md:w-72 ${(!isMobile || mobileLevel === 0) ? 'flex' : 'hidden'}`}>
                         <div className="p-4 font-bold text-xs uppercase tracking-wider opacity-80 border-b border-slate-700">Categories</div>
                         {editedTpl.structure.map(cat => (
-                            <button 
-                                key={cat.id}
-                                onClick={() => { setActiveCategoryId(cat.id); setActiveItemId(cat.items[0]?.id); }}
-                                className={`text-left px-4 py-3.5 text-sm font-bold flex justify-between items-center hover:bg-slate-800 transition-colors border-b border-slate-800 ${activeCategoryId === cat.id ? 'bg-slate-700 border-l-4 border-l-blue-400' : ''}`}
-                            >
-                                <span className="truncate pr-2">{cat.name}</span>
-                                {activeCategoryId === cat.id ? <ChevronDown size={14}/> : <ChevronRightIcon size={14} className="opacity-50"/>}
-                            </button>
+                            <div key={cat.id} className={`group flex items-center justify-between px-4 py-4 border-b border-slate-800 hover:bg-slate-800 transition-colors cursor-pointer ${activeCategoryId === cat.id && !isMobile ? 'bg-slate-700 border-l-4 border-l-blue-400' : ''}`} onClick={() => { setActiveCategoryId(cat.id); setActiveItemId(isMobile ? null : cat.items[0]?.id); }}>
+                                <input 
+                                    className="bg-transparent border-none outline-none text-white text-base font-bold w-full cursor-pointer"
+                                    value={cat.name || ''}
+                                    onChange={(e) => {
+                                        const newT = {...editedTpl};
+                                        newT.structure.find(c => c.id === cat.id).name = e.target.value;
+                                        setEditedTpl(newT);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()} 
+                                />
+                                <div className="flex items-center gap-3">
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteCategory(cat.id); }} className="text-slate-500 hover:text-red-400 p-2"><Trash2 size={16}/></button>
+                                    <ChevronRightIcon size={16} className="text-slate-500"/>
+                                </div>
+                            </div>
                         ))}
+                        <button onClick={handleAddCategory} className="w-full p-4 text-sm font-bold text-slate-400 hover:text-white flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors mt-auto border-t border-slate-700">
+                            <Plus size={16}/> Add Category
+                        </button>
                     </div>
 
-                    {/* COL 2: Sub-items (Light Sidebar) */}
-                    <div className="w-72 bg-slate-100 border-r border-slate-200 flex flex-col flex-shrink-0 overflow-y-auto">
-                         <div className="p-3 bg-slate-200 border-b border-slate-300 font-bold text-slate-700 text-xs flex justify-between items-center sticky top-0">
-                            <span className="truncate max-w-[180px]">{activeCategory?.name || 'Select Category'}</span>
+                    {/* COL 2: Sub-items */}
+                    <div className={`flex-col flex-shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 w-full md:w-72 ${(!isMobile && activeCategoryId) || (isMobile && mobileLevel === 1) ? 'flex' : 'hidden'}`}>
+                         <div className="p-3 bg-slate-200 border-b border-slate-300 font-bold text-slate-700 text-xs flex justify-between items-center sticky top-0 z-10">
+                            <span className="truncate max-w-[200px] uppercase tracking-wider">{activeCategory?.name || 'Select Category'}</span>
+                            <button onClick={handleAddItem} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><Plus size={12}/> Add</button>
                          </div>
-                         {activeCategory?.items.map(item => (
-                             <button 
-                                key={item.id}
-                                onClick={() => setActiveItemId(item.id)}
-                                className={`text-left px-4 py-3 text-xs border-b border-slate-200 hover:bg-white transition-colors flex items-start gap-2 ${activeItemId === item.id ? 'bg-white border-l-4 border-l-blue-600 font-bold text-blue-700 shadow-sm' : 'text-slate-600'}`}
-                             >
-                                 <FileText size={14} className="mt-0.5 flex-shrink-0 opacity-50"/>
-                                 <span className="leading-snug">{item.title}</span>
-                             </button>
+                         
+                         {Object.entries(groupedItems).map(([groupName, items]) => (
+                            <div key={groupName}>
+                                {groupName !== 'General' && <div className="px-4 py-2 bg-slate-100 text-[10px] font-bold text-blue-600 uppercase tracking-wide border-b border-slate-200">{groupName}</div>}
+                                {items.map(item => (
+                                    <div 
+                                        key={item.id}
+                                        className={`group flex items-center justify-between px-4 py-4 border-b border-slate-200 hover:bg-white transition-colors cursor-pointer ${activeItemId === item.id && !isMobile ? 'bg-white border-l-4 border-l-blue-600 shadow-sm' : ''}`}
+                                        onClick={() => setActiveItemId(item.id)}
+                                    >
+                                        <div className="flex items-start gap-3 overflow-hidden w-full">
+                                            <FileText size={16} className="mt-0.5 flex-shrink-0 text-slate-400"/>
+                                            <input 
+                                                className="bg-transparent border-none outline-none text-sm text-slate-800 font-medium w-full cursor-pointer"
+                                                value={item.title || ''}
+                                                onChange={(e) => {
+                                                    const newT = {...editedTpl};
+                                                    const c = newT.structure.find(c => c.id === activeCategoryId);
+                                                    c.items.find(i => i.id === item.id).title = e.target.value;
+                                                    setEditedTpl(newT);
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteItem(activeCategoryId, item.id); }} className="text-slate-300 hover:text-red-500 p-2"><Trash2 size={16}/></button>
+                                            {isMobile && <ChevronRightIcon size={16} className="text-slate-300"/>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                          ))}
-                         {!activeCategory && <div className="p-4 text-slate-400 italic text-xs">Select a category to view items.</div>}
+                         
+                         {!activeCategory && <div className="p-10 text-center text-slate-400 italic">Select a category first</div>}
                     </div>
 
-                    {/* COL 3: Editor (Main Area) */}
-                    <div className="flex-1 bg-white flex flex-col overflow-hidden">
+                    {/* COL 3: Editor */}
+                    <div className={`flex-col overflow-hidden bg-white w-full flex-1 ${(!isMobile && activeItemId) || (isMobile && mobileLevel === 2) ? 'flex' : 'hidden'}`}>
                         {activeItem ? (
-                            <>
-                                {/* Editor Header */}
-                                <div className="p-6 border-b border-slate-100">
-                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Item Title</label>
-                                     <input 
-                                        className="w-full p-2 border border-slate-200 rounded text-lg font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none" 
-                                        value={activeItem.title} 
-                                        onChange={(e) => {
-                                            const newTpl = { ...editedTpl };
-                                            const cat = newTpl.structure.find(c => c.id === activeCategoryId);
-                                            const itm = cat.items.find(i => i.id === activeItemId);
-                                            itm.title = e.target.value;
-                                            setEditedTpl(newTpl);
-                                        }}
-                                     />
+                            <div className="flex flex-col h-full">
+                                <div className="p-4 border-b border-slate-100 bg-white flex justify-between items-center">
+                                     <div className="flex flex-col w-full">
+                                         <span className="text-xs text-slate-400 uppercase tracking-widest mb-1">Item Title</span>
+                                         <input 
+                                            className="font-bold text-slate-700 text-lg border-b border-transparent focus:border-blue-500 outline-none w-full"
+                                            value={activeItem.title || ''} 
+                                            onChange={(e) => {
+                                                const newT = {...editedTpl};
+                                                const c = newT.structure.find(c => c.id === activeCategoryId);
+                                                c.items.find(i => i.id === activeItemId).title = e.target.value;
+                                                setEditedTpl(newT);
+                                            }}
+                                         />
+                                     </div>
                                 </div>
                                 
-                                {/* Editor Toolbar */}
-                                <div className="px-4 py-2 border-b border-slate-100 bg-slate-50 flex gap-2">
-                                     <button className="p-1.5 hover:bg-slate-200 rounded text-slate-600"><Bold size={14}/></button>
-                                     <button className="p-1.5 hover:bg-slate-200 rounded text-slate-600"><Italic size={14}/></button>
-                                     <div className="w-px h-6 bg-slate-300 mx-1"></div>
-                                     <button className="p-1.5 hover:bg-slate-200 rounded text-slate-600"><List size={14}/></button>
-                                </div>
+                                {/* Rich Text Editor */}
+                                <div className="flex-1 p-4 overflow-y-auto">
+                                    <div className="mb-4">
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Sub-Group</label>
+                                        <input 
+                                            className="w-full p-2 border border-slate-200 rounded text-sm"
+                                            value={activeItem.group || 'General'}
+                                            onChange={(e) => updateItemProp('group', e.target.value)}
+                                            placeholder="e.g. Terassa / Balkon"
+                                        />
+                                    </div>
 
-                                {/* Editor Text Area */}
-                                <div className="flex-1 p-6 overflow-y-auto">
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Description / Findings</label>
-                                    <textarea 
-                                        className="w-full h-96 p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none resize-none text-slate-600 leading-relaxed font-mono text-sm" 
-                                        placeholder="Type detailed description here..."
-                                        value={activeItem.content || ''}
-                                        onChange={(e) => updateItemContent(e.target.value)}
-                                    />
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Description</label>
+                                    <div className="border border-slate-200 rounded-lg overflow-hidden flex flex-col min-h-[300px] mb-6">
+                                        <RichTextEditor 
+                                            value={activeItem.content || ''} 
+                                            onChange={(val) => updateItemContent(val)}
+                                            placeholder="Type detailed description here..."
+                                        />
+                                    </div>
+
+                                    {/* Checkboxes */}
+                                    <div className="flex flex-col gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100 mb-6">
+                                        <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded transition-colors"><input type="checkbox" className="w-5 h-5 accent-blue-600 rounded" checked={!!activeItem.selected} onChange={e => updateItemProp('selected', e.target.checked)}/> <span className="text-sm font-medium text-slate-700">Selected for Report</span></label>
+                                        <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded transition-colors"><input type="checkbox" className="w-5 h-5 accent-green-600 rounded" checked={!!activeItem.complete} onChange={e => updateItemProp('complete', e.target.checked)}/> <span className="text-sm font-medium text-slate-700">Mark as Complete</span></label>
+                                        <div className="h-px bg-slate-200 my-1"></div>
+                                        <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded transition-colors"><input type="checkbox" className="w-5 h-5 accent-orange-600 rounded" checked={!!activeItem.major} onChange={e => updateItemProp('major', e.target.checked)}/> <span className="text-sm font-medium text-slate-700">Add to Major Summary</span></label>
+                                        <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded transition-colors"><input type="checkbox" className="w-5 h-5 accent-yellow-500 rounded" checked={!!activeItem.minor} onChange={e => updateItemProp('minor', e.target.checked)}/> <span className="text-sm font-medium text-slate-700">Add to Minor Summary</span></label>
+                                    </div>
                                     
-                                    {/* Footer / Meta */}
-                                    <div className="mt-4 flex items-center justify-between text-xs text-slate-400 border-t pt-4">
-                                        <span>Last modified: just now</span>
-                                        <div className="flex gap-2">
-                                            <span className="flex items-center gap-1"><CheckSquare size={12}/> Included in Report</span>
+                                     {/* Photos Section */}
+                                    <div className="border-t border-slate-100 pt-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h4 className="text-slate-700 font-bold text-sm">Photos</h4>
+                                            <button 
+                                                onClick={() => setReorderMode(!reorderMode)} 
+                                                className={`text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 ${reorderMode ? 'bg-orange-500' : 'bg-slate-500'}`}
+                                            >
+                                                {reorderMode ? 'Done' : 'Reorder'}
+                                            </button>
+                                        </div>
+                                        
+                                        {!reorderMode && (
+                                            <div 
+                                                className="border-2 border-dashed border-blue-200 bg-blue-50/30 rounded-xl p-6 flex flex-col items-center justify-center text-blue-500 gap-2 cursor-pointer hover:bg-blue-50 transition-colors mb-4"
+                                                onClick={() => fileInputRef.current.click()}
+                                            >
+                                                <Camera size={24}/>
+                                                <span className="text-sm font-bold">Add Photo</span>
+                                                <input type="file" className="hidden" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*"/>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {(activeItem.photos || []).map((photo, idx) => (
+                                                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm group">
+                                                    <img src={photo} className="w-full h-full object-cover" />
+                                                    {reorderMode ? (
+                                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-3">
+                                                            {idx > 0 && <button onClick={() => handlePhotoMove(idx, -1)} className="p-2 bg-white text-black rounded-full"><ArrowLeftIcon size={16}/></button>}
+                                                            {idx < (activeItem.photos.length - 1) && <button onClick={() => handlePhotoMove(idx, 1)} className="p-2 bg-white text-black rounded-full"><ArrowRightIcon size={16}/></button>}
+                                                        </div>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => handlePhotoDelete(idx)} 
+                                                            className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            <X size={14}/>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
-                            </>
+                            </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-slate-300">
-                                <FileText size={48} className="mb-4 opacity-20"/>
-                                <p>Select an item to edit content</p>
+                            <div className="flex flex-col items-center justify-center h-full text-slate-300 p-8 text-center">
+                                <FileText size={64} className="mb-4 opacity-20"/>
+                                <p className="text-lg font-medium">Select an item to edit</p>
+                                <p className="text-sm">Use the menu on the left</p>
                             </div>
                         )}
                     </div>
@@ -417,24 +684,24 @@ const TemplateManager = ({ mode = 'admin', templates, onCreate, onUpdate, onDele
 
     // RENDER: LIST MODE (Admin or Picker)
     return (
-        <div className="flex flex-col h-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 fixed inset-4 z-[200]">
+        <div className="flex flex-col h-full bg-white rounded-none md:rounded-2xl shadow-xl overflow-hidden border-0 md:border border-slate-200 fixed inset-0 md:inset-4 z-[200]">
             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
-                <h3 className="font-bold text-slate-700">{mode === 'picker' ? 'Select a Template' : 'Manage Templates'}</h3>
+                <h3 className="font-bold text-slate-700">{mode === 'picker' ? 'Select Template' : 'Manage Templates'}</h3>
                 <div className="flex gap-2">
                     <Button size="small" variant="secondary" icon={Globe} onClick={() => safeOpen('https://mytemplatewizard.com/templates.php')}>Browse Online</Button>
                     {mode === 'admin' && <button onClick={() => handleOpenDesigner()} className="bg-blue-100 text-blue-700 p-1.5 rounded-lg hover:bg-blue-200"><Plus size={18}/></button>}
-                    {onClose && <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>}
+                    {onClose && <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2"><X size={24}/></button>}
                 </div>
             </div>
             
             <div className="p-4 flex-1 overflow-y-auto space-y-3 bg-slate-50/50">
                 {templates.map(tpl => (
-                    <div key={tpl.id} onClick={() => { if(mode==='picker') onSelect(tpl); else handleOpenDesigner(tpl); }} className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm transition-all group cursor-pointer hover:border-blue-400 hover:shadow-md`}>
+                    <div key={tpl.id} onClick={() => { if(mode==='picker') onSelect(tpl); else handleOpenDesigner(tpl); }} className={`bg-white p-5 rounded-xl border border-slate-200 shadow-sm transition-all group cursor-pointer hover:border-blue-400 hover:shadow-md active:scale-[0.98]`}>
                         <div className="flex justify-between items-start mb-2">
                             <div>
                                 <span className="text-[10px] uppercase font-bold text-blue-500 tracking-wider mb-1 block">{tpl.category || 'General'}</span>
                                 <div className="flex items-center gap-2">
-                                    <h4 className="font-bold text-slate-800">{tpl.name}</h4>
+                                    <h4 className="font-bold text-slate-800 text-lg">{tpl.name}</h4>
                                     {/* Link Icon for Source */}
                                     {tpl.sourceUrl && (
                                         <button 
@@ -442,18 +709,18 @@ const TemplateManager = ({ mode = 'admin', templates, onCreate, onUpdate, onDele
                                             className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-1 rounded-full"
                                             title="Open Source"
                                         >
-                                            <ExternalLink size={12}/>
+                                            <ExternalLink size={16}/>
                                         </button>
                                     )}
                                 </div>
                             </div>
                             {mode === 'admin' && (
-                                <button onClick={(e) => { e.stopPropagation(); onDelete(tpl.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-1"><Trash2 size={16}/></button>
+                                <button onClick={(e) => { e.stopPropagation(); onDelete(tpl.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-2"><Trash2 size={20}/></button>
                             )}
                         </div>
-                        <div className="text-xs text-slate-400 mt-2 flex gap-4">
-                            <span className="flex items-center gap-1"><Folder size={12}/> {tpl.structure?.length || 0} Categories</span>
-                            <span className="flex items-center gap-1"><File size={12}/> {tpl.structure?.reduce((acc, cat) => acc + cat.items.length, 0) || 0} Items</span>
+                        <div className="text-xs text-slate-400 mt-3 flex gap-4">
+                            <span className="flex items-center gap-1.5"><Folder size={14}/> {tpl.structure?.length || 0} Categories</span>
+                            <span className="flex items-center gap-1.5"><File size={14}/> {tpl.structure?.reduce((acc, cat) => acc + cat.items.length, 0) || 0} Items</span>
                         </div>
                     </div>
                 ))}
@@ -722,7 +989,7 @@ export default function App() {
                       category: contentToSave.category || 'Imported',
                       structure: contentToSave.structure || [],
                       created: new Date().toISOString().split('T')[0],
-                      author: 'Imported'
+                      author: 'Imported',
                   });
                   showNotification("Template Imported");
               } else {
@@ -816,6 +1083,7 @@ export default function App() {
       });
   }, [user]);
 
+  // Use the robust helper function inside useEffect for food data
   useEffect(() => { 
     if (selectedAppointment && view === 'detail') { 
         setFoodData(generateRouteRestaurants(selectedAppointment.city)); 
@@ -861,6 +1129,7 @@ export default function App() {
                 onUpdate={handleUpdateTemplate} // Passing update function
                 onDelete={handleDeleteTemplate} 
                 onClose={() => setAdminView('map')} // Correct close action for admin tab
+                isMobile={isMobile}
              />
         </div>
     );
@@ -1079,6 +1348,7 @@ export default function App() {
                            onCreate={handleCreateTemplate}
                            onUpdate={handleUpdateTemplate}
                            onDelete={handleDeleteTemplate}
+                           isMobile={isMobile}
                        />
                    </div>
                </div>
